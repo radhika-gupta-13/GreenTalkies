@@ -14,6 +14,7 @@ import 'care_card.dart'; // CareReminderCard
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:greentalkies/config.dart';
 import 'package:flutter/foundation.dart'; // kIsWeb
 import 'package:network_info_plus/network_info_plus.dart';
 
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = false;
   String _errorMessage = '';
   String? _backendIp;
+  final String backendUrl = RuntimeConfig().backendUrl;
   String _userName = '';
   String? _userId;
 

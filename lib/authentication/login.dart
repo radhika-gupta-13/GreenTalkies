@@ -6,6 +6,7 @@ import 'package:network_info_plus/network_info_plus.dart'; // for local IP
 import 'package:shared_preferences/shared_preferences.dart';
 import '../home_content/home.dart';
 import 'sign_up.dart';
+import '../config.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -17,6 +18,8 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final String backendUrl = RuntimeConfig().backendUrl;
+
 
   bool _isLoading = false;
   bool _obscurePassword = true;

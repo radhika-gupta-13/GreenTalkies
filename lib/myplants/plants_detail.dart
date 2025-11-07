@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:greentalkies/colors.dart';
+import 'package:greentalkies/config.dart';
 import 'package:greentalkies/models/plant.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -9,7 +10,7 @@ import 'package:intl/intl.dart';
 
 class PlantDetailScreen extends StatefulWidget {
   final String plantId;
-  final String backendUrl; // Pass backend URL dynamically from MyPlantsScreen
+  final String backendUrl;
   const PlantDetailScreen({
     super.key,
     required this.plantId,
@@ -40,7 +41,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     });
 
     try {
-      final url = '${widget.backendUrl}/plants/${widget.plantId}';
+      final url = '${RuntimeConfig().backendUrl}/plants/${widget.plantId}';
       final response = await http.get(Uri.parse(url));
       print('Fetch plant response: ${response.statusCode} ${response.body}');
 
@@ -77,7 +78,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
 
     try {
       final response = await http.delete(
-        Uri.parse('${widget.backendUrl}/plants/${plant!.id}'),
+        Uri.parse('${RuntimeConfig().backendUrl}/plants/${plant!.id}'),
       );
       if (response.statusCode == 200) {
         Navigator.pop(context, true);
@@ -98,7 +99,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
 
     try {
       final response = await http.put(
-        Uri.parse('${widget.backendUrl}/plants/${plant!.id}'),
+        Uri.parse('${RuntimeConfig().backendUrl}/plants/${plant!.id}'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"healthStatus": newStatus}),
       );
@@ -131,7 +132,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
 
     final request = http.MultipartRequest(
       'PUT',
-      Uri.parse('${widget.backendUrl}/plants/${plant!.id}/image'),
+      Uri.parse('${RuntimeConfig().backendUrl}/plants/${plant!.id}/image'),
     );
     request.files.add(
       await http.MultipartFile.fromPath('image', _newImage!.path),

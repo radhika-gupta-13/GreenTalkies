@@ -1,22 +1,37 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:network_info_plus/network_info_plus.dart';
 
 class GeminiService {
-  final String baseUrl;
+  late String baseUrl; // initialize later
+  final String? backendUrl;
 
-  GeminiService({String? backendUrl})
-      : baseUrl = backendUrl ?? dotenv.env['API_BASE_URL'] ?? "http://192.168.0.103:4000/api";
+  GeminiService({this.backendUrl});
 
-  /// Lazy getter for API key
+  /// Initialize base URL (call this before using the service)
+  Future<void> init() async {
+    if (backendUrl != null) {
+      baseUrl = backendUrl!;
+    } else {
+      baseUrl = await _getAutoBaseUrl();
+    }
+  }
+
   String get apiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
 
-  Future<String> identifyPlant(File imageFile) async {
+  static Future<String> _getAutoBaseUrl() async {
+    final info = NetworkInfo();
+    String? ip = await info.getWifiIP(); // get device IP
+    ip ??= '192.168.0.103'; // fallback
+    return 'http://$ip:4000/api';
+  }
+
+  Future<String> identifyPlant(XFile imageFile) async {
     final uri = Uri.parse('$baseUrl/identify');
     final request = http.MultipartRequest('POST', uri);
     request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
-
     if (apiKey.isNotEmpty) request.headers['x-api-key'] = apiKey;
 
     final response = await request.send();
@@ -30,11 +45,10 @@ class GeminiService {
     }
   }
 
-  Future<String> diagnosePlant(File imageFile) async {
+  Future<String> diagnosePlant(XFile imageFile) async {
     final uri = Uri.parse('$baseUrl/diagnose');
     final request = http.MultipartRequest('POST', uri);
     request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
-
     if (apiKey.isNotEmpty) request.headers['x-api-key'] = apiKey;
 
     final response = await request.send();

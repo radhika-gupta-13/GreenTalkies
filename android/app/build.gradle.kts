@@ -6,12 +6,15 @@ plugins {
 
 android {
     namespace = "com.example.greentalkies"
-    compileSdk = 34
+    compileSdk = 35
     ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+
+        isCoreLibraryDesugaringEnabled = true
+
     }
 
     kotlinOptions {
@@ -21,7 +24,7 @@ android {
     defaultConfig {
         applicationId = "com.example.greentalkies"
         minSdk = 21
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
     }
@@ -36,6 +39,9 @@ android {
     }
 }
 
+dependencies{
+        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}
 flutter {
     source = "../.."
 }

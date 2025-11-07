@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'schedule_task.dart'; // Now contains ScheduleTaskForm
-import 'models.dart'; // PlantTask, GTColors
+import 'schedule_task.dart'; 
+import 'models.dart'; 
+import 'package:greentalkies/config.dart';
 
 class ScheduleTaskAutoOpenPage extends StatefulWidget {
   final String? userId; // Can be null
   final String backendUrl; // Non-nullable
+  
 
   const ScheduleTaskAutoOpenPage({
     super.key,
@@ -37,7 +39,7 @@ class _ScheduleTaskAutoOpenPageState extends State<ScheduleTaskAutoOpenPage> {
       body: SafeArea( // Added SafeArea for better layout on devices
         child: ScheduleTaskForm(
           onTaskAdded: _handleTaskAdded,
-          backendUrl: widget.backendUrl,
+          backendUrl: RuntimeConfig().backendUrl, // <-- fetch dynamically here
           userId: widget.userId,
         ),
       ),

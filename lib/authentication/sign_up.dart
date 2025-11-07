@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'package:greentalkies/config.dart';
 import 'package:flutter/foundation.dart'; // for kIsWeb
 import 'package:network_info_plus/network_info_plus.dart'; // for local IP
 import '../home_content/home.dart'; // Import HomeScreen
@@ -17,6 +18,7 @@ class _SignUpPageState extends State<SignUpPage> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final String backendUrl = RuntimeConfig().backendUrl;
 
   bool _isLoading = false;
   String? _backendIp;
@@ -25,7 +27,7 @@ class _SignUpPageState extends State<SignUpPage> {
   String? nameError;
   String? emailError;
   String? passwordError;
-  String? nameAvailability; // ✅ Available / ❌ Taken
+  String? nameAvailability; // Available /  Taken
 
   // Password strength
   double passwordStrength = 0;
@@ -56,11 +58,11 @@ class _SignUpPageState extends State<SignUpPage> {
 
   Future<void> _setBackendIp() async {
     if (kIsWeb) {
-      _backendIp = 'http://localhost:5000';
+      _backendIp = 'http://localhost:4000';
     } else {
       final info = NetworkInfo();
       String? wifiIp = await info.getWifiIP();
-      _backendIp = wifiIp != null ? 'http://$wifiIp:5000' : 'http://10.0.2.2:5000';
+      _backendIp = wifiIp != null ? 'http://$wifiIp:4000' : 'http://10.0.2.2:4000';
     }
     setState(() {});
   }

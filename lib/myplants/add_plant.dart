@@ -4,11 +4,13 @@ import 'package:greentalkies/colors.dart';
 import 'package:greentalkies/models/plant.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:greentalkies/config.dart';
 import 'package:image_picker/image_picker.dart';
 
 class AddPlantScreen extends StatefulWidget {
   final String userId;
   final String backendUrl; 
+  
   const AddPlantScreen({super.key, required this.userId, required this.backendUrl});
 
   @override
@@ -59,7 +61,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
     try {
       // Step 1: Create plant entry
       final response = await http.post(
-        Uri.parse('${widget.backendUrl}/plants'),
+        Uri.parse('${RuntimeConfig().backendUrl}/plants'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(newPlant),
       );
@@ -70,7 +72,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
 
         // Step 2: Upload image if selected
         if (_pickedImage != null) {
-          final uploadUri = Uri.parse('${widget.backendUrl}/plants/${createdPlant.id}/image');
+          final uploadUri = Uri.parse('${RuntimeConfig().backendUrl}/plants/${createdPlant.id}/image');
           final request = http.MultipartRequest('PUT', uploadUri);
           request.files.add(await http.MultipartFile.fromPath('image', _pickedImage!.path));
           final streamedResponse = await request.send();

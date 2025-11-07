@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'plants_detail.dart';
 import 'add_plant.dart';
+
 import '../models/plant.dart';
 
 // =======================================================
@@ -27,6 +28,7 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
   bool isLoading = true;
   bool hasError = false;
   String? backendUrl;
+
 
   @override
   void initState() {

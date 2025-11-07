@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'authentication/login.dart';
 import 'authentication/sign_up.dart';
 import 'authentication/forgot_password.dart';
@@ -7,6 +8,10 @@ import 'home_content/identify_diagnose.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables from .env file
+  await dotenv.load(fileName: "details.env");
+
   runApp(const GreenTalkiesApp());
 }
 

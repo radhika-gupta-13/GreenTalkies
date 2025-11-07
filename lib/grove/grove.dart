@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'post_detail_screen.dart';
 import 'post_screen.dart';
+import 'package:greentalkies/config.dart';
 
 // ----------------------------
 // Hardcoded sample posts

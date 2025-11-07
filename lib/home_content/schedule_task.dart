@@ -22,7 +22,8 @@ Future<void> initializeNotifications() async {
   tz.initializeTimeZones();
 }
 
-Future<void> scheduleNotification(String taskName, DateTime scheduledTime) async {
+Future<void> scheduleNotification(
+    String taskName, DateTime scheduledTime) async {
   final tzScheduled = tz.TZDateTime.from(scheduledTime, tz.local);
 
   const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
@@ -37,14 +38,14 @@ Future<void> scheduleNotification(String taskName, DateTime scheduledTime) async
       NotificationDetails(android: androidDetails);
 
   await flutterLocalNotificationsPlugin.zonedSchedule(
-    scheduledTime.millisecondsSinceEpoch ~/ 1000, // unique id
+    scheduledTime.millisecondsSinceEpoch,
     'Plant Task Reminder',
     taskName,
     tzScheduled,
     platformDetails,
-    androidAllowWhileIdle: true,
-    uiLocalNotificationDateInterpretation:
-        UILocalNotificationDateInterpretation.absoluteTime,
+    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    payload: 'task_reminder',
+    matchDateTimeComponents: DateTimeComponents.time, // optional
   );
 }
 
@@ -113,16 +114,20 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
     if (!_formKey.currentState!.validate()) return;
     if (_taskDateTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a date and time for the task.')),
+        const SnackBar(
+            content: Text('Please select a date and time for the task.')),
       );
       return;
     }
 
     _formKey.currentState!.save();
-    setState(() { _isLoading = true; });
+    setState(() {
+      _isLoading = true;
+    });
 
-    final formattedTime = "${_taskDateTime!.year}-${_taskDateTime!.month.toString().padLeft(2,'0')}-${_taskDateTime!.day.toString().padLeft(2,'0')} "
-        "${_taskDateTime!.hour.toString().padLeft(2,'0')}:${_taskDateTime!.minute.toString().padLeft(2,'0')}";
+    final formattedTime =
+        "${_taskDateTime!.year}-${_taskDateTime!.month.toString().padLeft(2, '0')}-${_taskDateTime!.day.toString().padLeft(2, '0')} "
+        "${_taskDateTime!.hour.toString().padLeft(2, '0')}:${_taskDateTime!.minute.toString().padLeft(2, '0')}";
 
     final newTask = PlantTask(
       key: UniqueKey().toString(),
@@ -158,7 +163,6 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
           message = 'Task saved locally, but failed to sync to server.';
           print('Backend post failed with status: ${response.statusCode}');
         }
-
       } catch (e) {
         backendSuccess = false;
         message = 'Task saved locally, but failed to connect to server.';
@@ -166,7 +170,9 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
       }
     }
 
-    setState(() { _isLoading = false; });
+    setState(() {
+      _isLoading = false;
+    });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -202,8 +208,8 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
               decoration: InputDecoration(
                 labelText: 'Enter Plant Name',
                 hintText: 'e.g. Monstera Deliciosa',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onSaved: (value) => _plantName = value ?? '',
               validator: (value) =>
@@ -216,8 +222,8 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
               decoration: InputDecoration(
                 labelText: 'Task Name',
                 hintText: 'e.g. Water, Fertilize, Rotate',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onSaved: (value) => _taskName = value ?? '',
               validator: (value) =>
@@ -232,9 +238,10 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
                   child: Text(
                     _taskDateTime != null
                         ? 'Scheduled: ${_taskDateTime!.day}/${_taskDateTime!.month}/${_taskDateTime!.year} '
-                          '${_taskDateTime!.hour.toString().padLeft(2,'0')}:${_taskDateTime!.minute.toString().padLeft(2,'0')}'
+                            '${_taskDateTime!.hour.toString().padLeft(2, '0')}:${_taskDateTime!.minute.toString().padLeft(2, '0')}'
                         : 'Select Date & Time',
-                    style: const TextStyle(fontSize: 16, color: GTColors.forestGreen),
+                    style: const TextStyle(
+                        fontSize: 16, color: GTColors.forestGreen),
                   ),
                 ),
                 ElevatedButton.icon(
@@ -304,14 +311,13 @@ class ScheduleTask {
     );
   }
 
-  Widget buildScheduleTaskButton(
-      BuildContext context,
-      void Function(PlantTask) onTaskAdded,
-      String backendUrl,
-      String? userId) {
+  Widget buildScheduleTaskButton(BuildContext context,
+      void Function(PlantTask) onTaskAdded, String backendUrl, String? userId) {
     return ElevatedButton.icon(
-      onPressed: () => navigateToScheduleTaskPage(context, onTaskAdded, backendUrl, userId),
-      icon: const Icon(Icons.check_circle_outline, size: 20, color: Colors.white),
+      onPressed: () =>
+          navigateToScheduleTaskPage(context, onTaskAdded, backendUrl, userId),
+      icon:
+          const Icon(Icons.check_circle_outline, size: 20, color: Colors.white),
       label: const Text('Schedule a New Care Task'),
       style: ElevatedButton.styleFrom(
         foregroundColor: Colors.white,

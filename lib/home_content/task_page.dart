@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:greentalkies/config.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:network_info_plus/network_info_plus.dart';
@@ -84,6 +85,8 @@ class _TaskManagerState extends State<TaskManagerState> {
   bool _isLoading = false;
   String _errorMessage = '';
   String? _backendUrl;
+  final String backendUrl = RuntimeConfig().backendUrl;
+
   final TextEditingController _newTaskController = TextEditingController();
 
   // 🎨 Task card color palette (cycled)
