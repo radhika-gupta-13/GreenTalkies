@@ -27,5 +27,6 @@ class GTColors {
   static const Color accentGreen = Color(0xFF81C784);
   static const Color lightGray = Color(0xFFBDBDBD);
   static const Color forestGreen= Color(0xFF1B5E20);
+  static const Color backgroundBeige = Color(0xFFFFFCEE);
   
 }

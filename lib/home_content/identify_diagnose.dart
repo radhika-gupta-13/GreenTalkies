@@ -1,8 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:greentalkies/colors.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:greentalkies/profile/service/gemini_service.dart';
 
 class IdentifyDiagnosePage extends StatefulWidget {
@@ -13,66 +11,144 @@ class IdentifyDiagnosePage extends StatefulWidget {
 }
 
 class _IdentifyDiagnosePageState extends State<IdentifyDiagnosePage> {
-  final ImagePicker _picker = ImagePicker();
-  XFile? _selectedImage;
+  final GeminiService _gemini = GeminiService();
+  final TextEditingController _searchController = TextEditingController();
+
+  File? _selectedImage;
   String? _resultText;
   bool _isLoading = false;
-  bool _isDiagnose = false;
+  String _currentMode = 'identify'; // Modes: identify, diagnose, soil
 
-  late GeminiService _gemini;
+  List<String>? _tips;
+  bool _showTips = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _initializeGemini();
+  /// Pick an image and process it according to mode
+  Future<void> _pickAndProcessImage() async {
+    setState(() => _isLoading = true);
+    try {
+      final File? pickedFile = await _gemini.pickImage();
+      if (pickedFile == null) return;
+
+      setState(() {
+        _selectedImage = pickedFile;
+        _resultText = null;
+        _showTips = false;
+      });
+
+      Map<String, dynamic> result;
+      if (_currentMode == 'identify') {
+        final res = await _gemini.identifyPlant(pickedFile);
+        result = _parseBackendResponse(res);
+      } else if (_currentMode == 'diagnose') {
+        final res = await _gemini.diagnosePlant(pickedFile);
+        result = _parseBackendResponse(res);
+      } else {
+        final res = await _gemini.diagnoseSoil(pickedFile);
+        result = _parseBackendResponse(res);
+      }
+
+      _processResult(result);
+    } catch (e) {
+      _showSnackBar('Error: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
-  /// ================= Initialize GeminiService with auto IP =================
-  Future<void> _initializeGemini() async {
-    if (!dotenv.isInitialized) await dotenv.load(fileName: ".env");
-
-    _gemini = GeminiService(); // default constructor
-    await _gemini.init(); // auto-detect IP or use .env
-  }
-
-  /// ================= Pick Image from Gallery and call API =================
-  Future<void> _pickAndProcessImage({required bool isDiagnose}) async {
-  try {
-    // Pick image
-    final XFile? pickedFile = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
-
-    if (pickedFile == null) return;
-
+  /// Manual text-based search
+  Future<void> _manualSearch(String query) async {
+    if (query.isEmpty) return;
     setState(() {
-      _selectedImage = pickedFile; // keep as XFile
-      _resultText = null;
-      _isDiagnose = isDiagnose;
       _isLoading = true;
+      _selectedImage = null;
+      _resultText = null;
+      _showTips = false;
     });
 
-    // Convert XFile -> File **only for API call**
-    File fileForApi = File(pickedFile.path);
+    try {
+      Map<String, dynamic> result;
+      if (_currentMode == 'identify') {
+        final res = await _gemini.identifyPlant(null, manualQuery: query);
+        result = _parseBackendResponse(res);
+      } else if (_currentMode == 'diagnose') {
+        final res = await _gemini.diagnosePlant(null, manualQuery: query);
+        result = _parseBackendResponse(res);
+      } else {
+        final res = await _gemini.diagnoseSoil(null, manualQuery: query);
+        result = _parseBackendResponse(res);
+      }
 
-    // Call GeminiService
-    String result;
-    if (isDiagnose) {
-      result = await _gemini.diagnosePlant(fileForApi);
-    } else {
-      result = await _gemini.identifyPlant(fileForApi);
+      _processResult(result);
+    } catch (e) {
+      _showSnackBar('Error: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  /// Parse backend response JSON to Map
+  Map<String, dynamic> _parseBackendResponse(dynamic res) {
+    if (res is String) {
+      // fallback if backend returns string
+      return {'name': res, 'cause': '', 'organic_treatment': []};
+    }
+    if (res is Map<String, dynamic> && res.containsKey('diagnosis')) {
+      return Map<String, dynamic>.from(res['diagnosis']);
+    }
+    return Map<String, dynamic>.from(res);
+  }
+
+  /// Processes diagnosis result and generates tips
+  void _processResult(Map<String, dynamic> result) {
+    final name = result['name'] ?? 'Unknown';
+    final cause = result['cause'] ?? '';
+    final List<String> backendTips = List<String>.from(result['organic_treatment'] ?? []);
+
+    // Generate extra tips based on keywords
+    final List<String> extraTips = _generateDynamicTips(name, cause);
+
+    setState(() {
+      _resultText = '$name\nCause: $cause';
+      _tips = [...backendTips, ...extraTips].toSet().toList(); // remove duplicates
+      _showTips = _tips!.isNotEmpty;
+    });
+  }
+
+  /// Generate extra organic tips based on keywords
+  List<String> _generateDynamicTips(String name, String cause) {
+    final tips = <String>[];
+    final lowerName = name.toLowerCase();
+    final lowerCause = cause.toLowerCase();
+
+    if (lowerName.contains('yellow leaves') || lowerCause.contains('nitrogen')) {
+      tips.add('Add compost or banana peel water for nitrogen boost.');
+      tips.add('Avoid overwatering; check soil moisture before watering.');
+    }
+    if (lowerName.contains('mildew') || lowerName.contains('fungus') || lowerCause.contains('fungal')) {
+      tips.add('Spray diluted neem oil or cinnamon powder solution.');
+      tips.add('Improve air circulation and avoid water on leaves.');
+    }
+    if (lowerName.contains('pest') || lowerName.contains('aphid') || lowerCause.contains('insect')) {
+      tips.add('Spray neem oil or soapy water on leaves.');
+      tips.add('Use garlic or turmeric water to repel pests.');
+    }
+    if (lowerName.contains('wilting') || lowerCause.contains('root rot')) {
+      tips.add('Ensure proper drainage and avoid overwatering.');
+      tips.add('Add compost tea or seaweed extract to strengthen roots.');
+    }
+    if (lowerCause.contains('nutrient deficiency')) {
+      tips.add('Use organic compost or diluted cow dung manure.');
+      tips.add('Add a mix of crushed eggshells for calcium boost.');
+    }
+    if (lowerName.contains('dry soil') || lowerCause.contains('moisture')) {
+      tips.add('Add organic mulch or cocopeat to retain water.');
+    }
+    if (lowerName.contains('compact soil')) {
+      tips.add('Loosen soil and mix sand for better aeration.');
     }
 
-    setState(() {
-      _resultText = result;
-      _isLoading = false;
-    });
-  } catch (e) {
-    setState(() => _isLoading = false);
-    _showSnackBar('Error: $e');
+    return tips;
   }
-}
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -81,234 +157,127 @@ class _IdentifyDiagnosePageState extends State<IdentifyDiagnosePage> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: GTColors.secondaryBaseLight,
       appBar: AppBar(
         title: const Text(
-          'Identify or Diagnose',
+          'Identify / Diagnose / Soil',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: GTColors.primaryBaseDark,
           ),
         ),
-        backgroundColor: const Color.fromARGB(255, 60, 162, 65),
+        backgroundColor: GTColors.lushGreen,
         elevation: 0,
-        iconTheme: const IconThemeData(color: GTColors.primaryBaseDark),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
+          children: [
             const Text(
-              'What can we help you identify today?',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-                color: GTColors.primaryBaseDark,
-              ),
+              'Choose Mode:',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _modeButton('Identify', 'identify', GTColors.lushGreen),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _modeButton('Diagnose', 'diagnose', Colors.orange),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _modeButton('Soil Diagnose', 'soil', Colors.brown),
+                ),
+              ],
             ),
             const SizedBox(height: 30),
-            _buildPhotoSubmissionSection(),
-            if (_selectedImage != null) ...[
-              const SizedBox(height: 20),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.file(
-                  File(_selectedImage!.path),
-                  height: 220,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ],
+            _buildPhotoSection(),
+            const SizedBox(height: 15),
+            _buildQuickTipsCard(),
+            const SizedBox(height: 20),
+            _buildManualSearchField(),
+            const SizedBox(height: 20),
             if (_isLoading)
               const Center(
                 child: CircularProgressIndicator(color: GTColors.lushGreen),
               )
-            else if (_resultText != null) ...[
-              const SizedBox(height: 20),
-              _buildResultSection(_resultText!),
-            ],
-            const SizedBox(height: 30),
-            const Divider(color: GTColors.darkText, thickness: 0.1),
-            const SizedBox(height: 30),
-            const Text(
-              'Or, Search Manually',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: GTColors.primaryBaseDark,
-              ),
-            ),
-            const SizedBox(height: 15),
-            _buildManualSearchField(),
-            const SizedBox(height: 40),
-            _buildQuickTipsSection(),
+            else if (_resultText != null)
+              _buildResultSection(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPhotoSubmissionSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: GTColors.darkText.withOpacity(0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
+  Widget _modeButton(String label, String mode, Color color) {
+    return ElevatedButton(
+      onPressed: _isLoading
+          ? null
+          : () {
+              setState(() {
+                _currentMode = mode;
+                _selectedImage = null;
+                _resultText = null;
+                _tips = null;
+                _showTips = false;
+                _searchController.clear();
+              });
+            },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: _currentMode == mode ? color : color.withOpacity(0.5),
+        padding: const EdgeInsets.symmetric(vertical: 12),
       ),
-      child: Column(
-        children: [
-          const Icon(Icons.photo_library_outlined,
-              color: GTColors.lushGreen, size: 50),
-          const SizedBox(height: 10),
-          const Text(
-            'Select a photo of the plant or its issue',
-            style: TextStyle(color: GTColors.darkText),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildActionButton(
-                'Identify',
-                Icons.photo_library,
-                () => _pickAndProcessImage(isDiagnose: false),
-                GTColors.lushGreen,
-              ),
-              _buildActionButton(
-                'Diagnose',
-                Icons.healing_rounded,
-                () => _pickAndProcessImage(isDiagnose: true),
-                Colors.orange,
-              ),
-            ],
-          ),
-        ],
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontSize: 14),
       ),
     );
   }
 
-  Widget _buildActionButton(
-          String label, IconData icon, VoidCallback onPressed, Color color) =>
-      ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 20),
-        label: Text(label),
-        style: ElevatedButton.styleFrom(
-          foregroundColor: Colors.white,
-          backgroundColor: color,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+  Widget _buildPhotoSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Or pick a photo:'),
+        const SizedBox(height: 10),
+        ElevatedButton.icon(
+          onPressed: _isLoading ? null : _pickAndProcessImage,
+          icon: const Icon(Icons.photo_library),
+          label: const Text('Select Photo'),
+          style: ElevatedButton.styleFrom(backgroundColor: GTColors.lushGreen),
         ),
-      );
+        if (_selectedImage != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 15),
+            child: Image.file(_selectedImage!, height: 220, fit: BoxFit.cover),
+          ),
+      ],
+    );
+  }
 
-  Widget _buildResultSection(String result) => Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: GTColors.lushGreen, width: 1.2),
-          boxShadow: [
-            BoxShadow(
-              color: GTColors.darkText.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _isDiagnose ? 'Diagnosis Result:' : 'Identification Result:',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: GTColors.primaryBaseDark,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              result,
-              style: const TextStyle(
-                  fontSize: 14, color: GTColors.darkText, height: 1.4),
-            ),
-          ],
-        ),
-      );
-
-  Widget _buildManualSearchField() => TextField(
-        decoration: InputDecoration(
-          hintText: 'e.g. Monstera Deliciosa, Yellowing Leaves',
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15),
-            borderSide: const BorderSide(color: GTColors.lushGreen, width: 2),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15),
-            borderSide: BorderSide(
-              color: GTColors.darkText.withOpacity(0.3),
-              width: 1,
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15),
-            borderSide: const BorderSide(color: GTColors.lushGreen, width: 2),
-          ),
-          suffixIcon: IconButton(
-            icon: const Icon(Icons.search, color: GTColors.lushGreen),
-            onPressed: () => _showSnackBar('Searching manually...'),
-          ),
-          filled: true,
-          fillColor: Colors.white,
-        ),
-        onSubmitted: (value) => _showSnackBar('Searching for: $value'),
-      );
-
-  Widget _buildQuickTipsSection() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Quick Tip for Diagnosis:',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: GTColors.primaryBaseDark,
-            ),
-          ),
-          const SizedBox(height: 10),
-          _buildTipCard(
-            'Take a clear, well-lit photo of the **entire plant** and a close-up of the **affected leaf** or area.',
-            Icons.lightbulb_outline,
-          ),
-        ],
-      );
-
-  Widget _buildTipCard(String text, IconData icon) {
-    final parts = text.split('**');
-    final spans = <TextSpan>[];
-    for (int i = 0; i < parts.length; i++) {
-      spans.add(TextSpan(
-        text: parts[i],
-        style: TextStyle(
-          fontWeight: i % 2 != 0 ? FontWeight.bold : FontWeight.normal,
-          color: GTColors.darkText,
-          fontSize: 14,
-          height: 1.5,
-        ),
-      ));
+  Widget _buildQuickTipsCard() {
+    String tip;
+    if (_currentMode == 'identify') {
+      tip = 'Take a clear, well-lit photo of the entire plant.';
+    } else if (_currentMode == 'diagnose') {
+      tip = 'Capture affected leaves or stems clearly.';
+    } else {
+      tip = 'Take a close-up photo of soil texture and color.';
     }
+
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -316,13 +285,75 @@ class _IdentifyDiagnosePageState extends State<IdentifyDiagnosePage> {
         borderRadius: BorderRadius.circular(15),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: GTColors.lushGreen, size: 24),
+          const Icon(Icons.lightbulb_outline, color: GTColors.lushGreen, size: 24),
           const SizedBox(width: 10),
-          Expanded(child: RichText(text: TextSpan(children: spans))),
+          Expanded(
+            child: Text(
+              tip,
+              style: const TextStyle(fontSize: 14, color: GTColors.darkText, height: 1.4),
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildManualSearchField() {
+    return TextField(
+      controller: _searchController,
+      decoration: InputDecoration(
+        hintText: 'Enter plant/soil name or symptom',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.search, color: GTColors.lushGreen),
+          onPressed: _isLoading ? null : () => _manualSearch(_searchController.text.trim()),
+        ),
+      ),
+      onSubmitted: (value) {
+        if (!_isLoading) _manualSearch(value.trim());
+      },
+    );
+  }
+
+  Widget _buildResultSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: GTColors.lushGreen, width: 1.2),
+          ),
+          child: Text(
+            _resultText ?? '',
+            style: const TextStyle(fontSize: 14, color: GTColors.darkText, height: 1.5),
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (_tips != null && _showTips)
+          ExpansionTile(
+            initiallyExpanded: true,
+            title: const Text(
+              'Organic Remedies',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: GTColors.primaryBaseDark,
+              ),
+            ),
+            children: _tips!
+                .map(
+                  (tip) => ListTile(
+                    leading: const Icon(Icons.check_circle_outline, color: GTColors.lushGreen),
+                    title: Text(tip, style: const TextStyle(fontSize: 14)),
+                  ),
+                )
+                .toList(),
+          ),
+      ],
     );
   }
 }

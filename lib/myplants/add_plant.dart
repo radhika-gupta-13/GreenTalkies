@@ -10,7 +10,7 @@ import 'package:image_picker/image_picker.dart';
 class AddPlantScreen extends StatefulWidget {
   final String userId;
   final String backendUrl; 
-  
+
   const AddPlantScreen({super.key, required this.userId, required this.backendUrl});
 
   @override
@@ -25,9 +25,9 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
   File? _pickedImage;
   bool isSaving = false;
 
-  // =========================
-  // Pick image from gallery or camera
-  // =========================
+  /// =========================
+  /// Pick image from gallery or camera
+  /// =========================
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(
@@ -41,9 +41,9 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
     }
   }
 
-  // =========================
-  // Save Plant to backend
-  // =========================
+  /// =========================
+  /// Save Plant to backend
+  /// =========================
   Future<void> _savePlant() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -55,13 +55,13 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
       "nickname": _nicknameController.text,
       "healthStatus": "Recently Added",
       "nextAction": "Check in 1 week",
-      "imageUrl": "", // Initially empty, will upload separately
+      "imageUrl": "",
     };
 
     try {
       // Step 1: Create plant entry
       final response = await http.post(
-        Uri.parse('${RuntimeConfig().backendUrl}/plants'),
+        Uri.parse('${widget.backendUrl}/plants'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(newPlant),
       );
@@ -72,9 +72,10 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
 
         // Step 2: Upload image if selected
         if (_pickedImage != null) {
-          final uploadUri = Uri.parse('${RuntimeConfig().backendUrl}/plants/${createdPlant.id}/image');
+          final uploadUri = Uri.parse('${widget.backendUrl}/plants/${createdPlant.id}/image');
           final request = http.MultipartRequest('PUT', uploadUri);
           request.files.add(await http.MultipartFile.fromPath('image', _pickedImage!.path));
+
           final streamedResponse = await request.send();
           final uploadResponse = await http.Response.fromStream(streamedResponse);
 
@@ -92,16 +93,18 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
       }
     } catch (e) {
       print('Error saving plant: $e');
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Error saving plant')));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Error saving plant')));
+      }
     } finally {
-      setState(() => isSaving = false);
+      if (mounted) setState(() => isSaving = false);
     }
   }
 
-  // =========================
-  // Build UI
-  // =========================
+  /// =========================
+  /// Build UI
+  /// =========================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -178,7 +181,8 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                   onPressed: isSaving ? null : _savePlant,
                   style: ElevatedButton.styleFrom(
                       backgroundColor: GTColors.lushGreen,
-                      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15)),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 30, vertical: 15)),
                   child: isSaving
                       ? const CircularProgressIndicator(color: Colors.white)
                       : const Text('Save Plant'),

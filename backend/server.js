@@ -4,22 +4,34 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
 import os from "os";
-import identifyRoute from "./routes/identify.js";
-import Plant from "./models/Plant.js";
-import Task from "./models/Task.js";
-import GrovePost from "./models/GrovePost.js"; 
 import path from "path";
 
-// Routes
+// --------------------
+// Import Routes
+// --------------------
+import identifyRoute from "./routes/identify.js";
+import diagnoseRoute from "./routes/diagnose.js";
 import taskRoutes from "./routes/tasks.js";
 import authRoutes from "./routes/auth.js";
 import plantRoutes from "./routes/plants.js";
 import groveRoutes from "./routes/grove.js";
 
-// Models
+// --------------------
+// Import Models
+// --------------------
 import User from "./models/User.js";
 import LoginHistory from "./models/LoginHistory.js";
+import Plant from "./models/Plant.js";
+import Task from "./models/Task.js";
+import GrovePost from "./models/GrovePost.js";
+import Product from "./models/Product.js";
+import Cart from "./models/Cart.js";
+import Wishlist from "./models/Wishlist.js";
+import Order from "./models/Order.js";
 
+// --------------------
+// Config
+// --------------------
 dotenv.config({ path: "./details.env" });
 
 const app = express();
@@ -29,6 +41,10 @@ const app = express();
 // --------------------
 app.use(cors());
 app.use(bodyParser.json());
+
+// Serve static files
+app.use("/uploads", express.static(path.join(".", "uploads")));
+app.use("/assets", express.static(path.join(path.resolve(), "assets")));
 
 // --------------------
 // MongoDB Connection
@@ -43,20 +59,18 @@ mongoose
   .catch((err) => console.log("❌ MongoDB Error:", err.message));
 
 // --------------------
-// Routes
+// Main Routes
 // --------------------
 app.use("/tasks", taskRoutes);
 app.use("/auth", authRoutes);
 app.use("/plants", plantRoutes);
-app.use("/api", identifyRoute);
 app.use("/grove", groveRoutes);
-
+app.use("/api/identify", identifyRoute);
+app.use("/api/diagnose", diagnoseRoute);
 
 // --------------------
 // User Routes
 // --------------------
-
-// Fetch user by ID
 app.get("/user/:id", async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
@@ -67,7 +81,6 @@ app.get("/user/:id", async (req, res) => {
   }
 });
 
-// Update user profile
 app.put("/user/:id", async (req, res) => {
   try {
     const updatedUser = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -79,7 +92,7 @@ app.put("/user/:id", async (req, res) => {
 });
 
 // --------------------
-// Signup
+// Signup / Login / Auth
 // --------------------
 app.post("/auth/signup", async (req, res) => {
   try {
@@ -100,9 +113,6 @@ app.post("/auth/signup", async (req, res) => {
   }
 });
 
-// --------------------
-// Login
-// --------------------
 app.post("/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -132,8 +142,6 @@ app.post("/auth/login", async (req, res) => {
   }
 });
 
-// --------------------
-// Logout (optional)
 app.post("/auth/logout", async (req, res) => {
   try {
     res.status(200).json({ message: "Logged out successfully" });
@@ -142,8 +150,6 @@ app.post("/auth/logout", async (req, res) => {
   }
 });
 
-// --------------------
-// Forgot Password (mock)
 app.post("/auth/forgot", async (req, res) => {
   try {
     const { email } = req.body;
@@ -158,30 +164,23 @@ app.post("/auth/forgot", async (req, res) => {
 });
 
 // --------------------
-// Impact Metrics Route
+// Impact Metrics
 // --------------------
 app.get("/user/:id/impact", async (req, res) => {
   try {
     const userId = req.params.id;
 
-    // Total plants planted by this user
     const plantsPlanted = await Plant.countDocuments({ userId });
-
-    // Total tasks completed (if you want to keep this)
     const tasksCompleted = await Task.countDocuments({ userId, status: "done" });
-
-    // CO2 absorbed (example: each plant absorbs 1.5 kg CO2)
     const co2PerPlant = 1.5;
     const co2Absorbed = plantsPlanted * co2PerPlant;
-
-    // Total community posts in Grove by this user
     const communityPosts = await GrovePost.countDocuments({ userId });
 
     res.status(200).json({
       plantsPlanted,
       tasksCompleted,
       co2Absorbed,
-      communityPosts, // Added this field
+      communityPosts,
     });
   } catch (err) {
     console.error("❌ Error fetching impact metrics:", err);
@@ -190,15 +189,90 @@ app.get("/user/:id/impact", async (req, res) => {
 });
 
 // --------------------
-// Static Files for Uploads
+// Bud & Basket Marketplace Routes
 // --------------------
-app.use("/uploads", express.static(path.join('.', 'uploads')));
-// Serve uploaded images
-//app.use("/uploads", express.static(path.join(path.resolve(), "uploads")));
 
-// Serve static assets (optional, for default images)
-app.use("/assets", express.static(path.join(path.resolve(), "assets")));
+// Products
+app.get("/products", async (req, res) => {
+  try {
+    const products = await Product.find();
+    res.json(products);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
+app.get("/products/:id", async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Cart
+app.post("/cart/add", async (req, res) => {
+  try {
+    const { userId, productId, quantity } = req.body;
+    if (!userId || !productId || !quantity)
+      return res.status(400).json({ message: "Missing required fields" });
+
+    const product = await Product.findById(productId);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    const cartItem = new Cart({ user: userId, product: productId, quantity });
+    await cartItem.save();
+
+    res.status(200).json({ message: "Added to cart successfully", cartItem });
+  } catch (err) {
+    console.error("Cart Add Error:", err);
+    res.status(500).json({ message: "Failed to add to cart", error: err.message });
+  }
+});
+
+// Wishlist
+app.post("/wishlist/toggle", async (req, res) => {
+  try {
+    const { userId, productId } = req.body;
+    if (!userId || !productId)
+      return res.status(400).json({ message: "Missing required fields" });
+
+    const existing = await Wishlist.findOne({ user: userId, product: productId });
+    if (existing) {
+      await existing.remove();
+      return res.status(200).json({ message: "Removed from wishlist" });
+    } else {
+      const wishlistItem = new Wishlist({ user: userId, product: productId });
+      await wishlistItem.save();
+      return res.status(200).json({ message: "Added to wishlist" });
+    }
+  } catch (err) {
+    console.error("Wishlist Error:", err);
+    res.status(500).json({ message: "Failed to toggle wishlist", error: err.message });
+  }
+});
+
+// Orders
+app.post("/order/create", async (req, res) => {
+  try {
+    const { userId, productId, quantity } = req.body;
+    if (!userId || !productId || !quantity)
+      return res.status(400).json({ message: "Missing required fields" });
+
+    const product = await Product.findById(productId);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    const order = new Order({ user: userId, product: productId, quantity, status: "pending" });
+    await order.save();
+
+    res.status(200).json({ message: "Order placed successfully", order });
+  } catch (err) {
+    console.error("Order Create Error:", err);
+    res.status(500).json({ message: "Failed to place order", error: err.message });
+  }
+});
 
 // --------------------
 // Server Startup
@@ -207,7 +281,6 @@ const PORT = 4000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
 
-  // Log local IPv4 addresses
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {

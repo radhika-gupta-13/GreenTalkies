@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:greentalkies/colors.dart';
-import 'package:greentalkies/config.dart';
 import 'package:greentalkies/models/plant.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -11,6 +10,7 @@ import 'package:intl/intl.dart';
 class PlantDetailScreen extends StatefulWidget {
   final String plantId;
   final String backendUrl;
+
   const PlantDetailScreen({
     super.key,
     required this.plantId,
@@ -35,13 +35,14 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
 
   // ==================== Fetch single plant ====================
   Future<void> _fetchPlant() async {
+    if (!mounted) return;
     setState(() {
       isLoading = true;
       hasError = false;
     });
 
     try {
-      final url = '${RuntimeConfig().backendUrl}/plants/${widget.plantId}';
+      final url = '${widget.backendUrl}/plants/${widget.plantId}';
       final response = await http.get(Uri.parse(url));
       print('Fetch plant response: ${response.statusCode} ${response.body}');
 
@@ -49,26 +50,22 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
         final decoded = jsonDecode(response.body);
 
         if (decoded is Map<String, dynamic>) {
-          // Normal single plant object
-          setState(() => plant = Plant.fromJson(decoded));
-        } else if (decoded is List &&
-            decoded.isNotEmpty &&
-            decoded[0] is Map<String, dynamic>) {
-          // Backend returned a list with single plant
-          setState(() => plant = Plant.fromJson(decoded[0]));
+          plant = Plant.fromJson(decoded);
+        } else if (decoded is List && decoded.isNotEmpty && decoded[0] is Map<String, dynamic>) {
+          plant = Plant.fromJson(decoded[0]);
         } else {
           print('❌ Unexpected response format');
-          setState(() => hasError = true);
+          hasError = true;
         }
       } else {
         print('❌ Fetch failed: ${response.statusCode}');
-        setState(() => hasError = true);
+        hasError = true;
       }
     } catch (e) {
       print('❌ Error fetching plant: $e');
-      setState(() => hasError = true);
+      hasError = true;
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -78,18 +75,19 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
 
     try {
       final response = await http.delete(
-        Uri.parse('${RuntimeConfig().backendUrl}/plants/${plant!.id}'),
+        Uri.parse('${widget.backendUrl}/plants/${plant!.id}'),
       );
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && mounted) {
         Navigator.pop(context, true);
       } else {
         throw Exception('Failed to delete plant');
       }
     } catch (e) {
       print('❌ Error deleting plant: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Error deleting plant')));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Error deleting plant')));
+      }
     }
   }
 
@@ -99,24 +97,24 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
 
     try {
       final response = await http.put(
-        Uri.parse('${RuntimeConfig().backendUrl}/plants/${plant!.id}'),
+        Uri.parse('${widget.backendUrl}/plants/${plant!.id}'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"healthStatus": newStatus}),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && mounted) {
         setState(() => plant = Plant.fromJson(jsonDecode(response.body)));
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Health updated successfully')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Health updated successfully')));
       } else {
         throw Exception('Failed to update health');
       }
     } catch (e) {
       print('❌ Error updating health: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Error updating health')));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Error updating health')));
+      }
     }
   }
 
@@ -128,38 +126,38 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
+    if (!mounted) return;
     setState(() => _newImage = File(picked.path));
 
     final request = http.MultipartRequest(
       'PUT',
-      Uri.parse('${RuntimeConfig().backendUrl}/plants/${plant!.id}/image'),
+      Uri.parse('${widget.backendUrl}/plants/${plant!.id}/image'),
     );
-    request.files.add(
-      await http.MultipartFile.fromPath('image', _newImage!.path),
-    );
+    request.files.add(await http.MultipartFile.fromPath('image', _newImage!.path));
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Uploading image...')));
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Uploading image...')));
+    }
 
     try {
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && mounted) {
         setState(() => plant = Plant.fromJson(jsonDecode(response.body)));
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Image updated successfully')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Image updated successfully')));
         _newImage = null;
       } else {
         throw Exception('Failed to upload image');
       }
     } catch (e) {
       print('❌ Error uploading image: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Error uploading image')));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Error uploading image')));
+      }
     }
   }
 
@@ -185,12 +183,9 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
   Widget _buildPlantImage() {
     ImageProvider imageProvider;
 
-    // 1️⃣ If a new image was just picked
     if (_newImage != null) {
       imageProvider = FileImage(_newImage!);
-    }
-    // 2️⃣ If plant has a valid imageUrl
-    else if (plant?.imageUrl != null && plant!.imageUrl!.isNotEmpty) {
+    } else if (plant?.imageUrl != null && plant!.imageUrl!.isNotEmpty) {
       final url = plant!.imageUrl!;
       if (url.startsWith('http')) {
         imageProvider = NetworkImage(url);
@@ -199,9 +194,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
       } else {
         imageProvider = const AssetImage('assets/default_plant.jpg');
       }
-    }
-    // 3️⃣ Fallback to default image
-    else {
+    } else {
       imageProvider = const AssetImage('assets/default_plant.jpg');
     }
 
@@ -211,7 +204,6 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
       width: double.infinity,
       fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) {
-        // Handles broken URLs, invalid files, etc.
         return const Image(
           image: AssetImage('assets/default_plant.jpg'),
           height: 220,
@@ -224,8 +216,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     if (hasError) {
       return Scaffold(
@@ -237,22 +228,14 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.error_outline,
-                size: 60,
-                color: Colors.redAccent,
-              ),
+              const Icon(Icons.error_outline, size: 60, color: Colors.redAccent),
               const SizedBox(height: 15),
-              const Text(
-                'Unable to fetch plant 🌱',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              const Text('Unable to fetch plant 🌱',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
               ElevatedButton(
                 onPressed: _fetchPlant,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: GTColors.lushGreen,
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: GTColors.lushGreen),
                 child: const Text('Retry'),
               ),
             ],
@@ -261,8 +244,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
       );
     }
 
-    if (plant == null)
-      return const Scaffold(body: Center(child: Text('Plant not found')));
+    if (plant == null) return const Scaffold(body: Center(child: Text('Plant not found')));
 
     final formattedDate = plant!.createdAt != null
         ? DateFormat('dd MMM yyyy').format(plant!.createdAt!)
@@ -273,7 +255,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
         title: Text(plant!.nickname),
         backgroundColor: GTColors.lushGreen,
         actions: [
-          IconButton(icon: const Icon(Icons.delete,color: Colors.red), onPressed: _deletePlant),
+          IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: _deletePlant),
         ],
       ),
       body: SingleChildScrollView(
@@ -295,61 +277,34 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    plant!.name,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  Text(plant!.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
-                  Text(
-                    'Nickname: ${plant!.nickname}',
-                    style: const TextStyle(fontSize: 16),
-                  ),
+                  Text('Nickname: ${plant!.nickname}', style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 5),
-                  Text(
-                    'Date Added: $formattedDate',
-                    style: const TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
+                  Text('Date Added: $formattedDate', style: const TextStyle(fontSize: 16, color: Colors.grey)),
                   const SizedBox(height: 5),
-                  Text(
-                    'Health: ${plant!.healthStatus}',
-                    style: TextStyle(color: plant!.healthColor, fontSize: 16),
-                  ),
+                  Text('Health: ${plant!.healthStatus}', style: TextStyle(color: plant!.healthColor, fontSize: 16)),
                   const SizedBox(height: 5),
-                  Text(
-                    'Next Action: ${plant!.nextAction}',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 10.0),
-                    child: Divider(),
-                  ),
+                  Text('Next Action: ${plant!.nextAction}', style: const TextStyle(fontSize: 16)),
+                  const Padding(padding: EdgeInsets.symmetric(vertical: 10.0), child: Divider()),
                   Row(
                     children: [
-                      const Text(
-                        'Update Health: ',
-                        style: TextStyle(fontSize: 16),
-                      ),
+                      const Text('Update Health: ', style: TextStyle(fontSize: 16)),
                       const SizedBox(width: 10),
                       DropdownButton<String>(
                         value: plant!.healthStatus,
-                        items:
-                            <String>[
-                                  'Excellent Health',
-                                  'Good Health',
-                                  'Needs Water',
-                                  'Pest Alert!',
-                                  'Recently Added',
-                                ]
-                                .map(
-                                  (status) => DropdownMenuItem<String>(
-                                    value: status,
-                                    child: Text(status),
-                                  ),
-                                )
-                                .toList(),
+                        items: <String>[
+                          'Excellent Health',
+                          'Good Health',
+                          'Needs Water',
+                          'Pest Alert!',
+                          'Recently Added',
+                        ]
+                            .map((status) => DropdownMenuItem<String>(
+                                  value: status,
+                                  child: Text(status),
+                                ))
+                            .toList(),
                         onChanged: (value) {
                           if (value != null) _updateHealth(value);
                         },

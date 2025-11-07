@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'schedule_task.dart'; 
 import 'models.dart'; 
-import 'package:greentalkies/config.dart';
 
 class ScheduleTaskAutoOpenPage extends StatefulWidget {
-  final String? userId; // Can be null
-  final String backendUrl; // Non-nullable
-  
+  final String? userId;
+  final String backendUrl;
 
   const ScheduleTaskAutoOpenPage({
     super.key,
@@ -20,27 +18,29 @@ class ScheduleTaskAutoOpenPage extends StatefulWidget {
 }
 
 class _ScheduleTaskAutoOpenPageState extends State<ScheduleTaskAutoOpenPage> {
-  // Callback after a task is added in the ScheduleTaskForm
   void _handleTaskAdded(PlantTask task) {
-    // Optional: update parent list if needed
-    // ScaffoldMessenger.of(context).showSnackBar(
-    //   SnackBar(content: Text('Task "${task.task}" added!')),
-    // );
+    // Optionally show a confirmation
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Task "${task.task}" added!')),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Schedule Task'),
+        title: const Text('Schedule Plant Care Task'),
         backgroundColor: GTColors.radiantGreen,
         foregroundColor: Colors.white,
       ),
-      body: SafeArea( // Added SafeArea for better layout on devices
-        child: ScheduleTaskForm(
-          onTaskAdded: _handleTaskAdded,
-          backendUrl: RuntimeConfig().backendUrl, // <-- fetch dynamically here
-          userId: widget.userId,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: ScheduleTaskForm(
+            onTaskAdded: _handleTaskAdded,
+            backendUrl: widget.backendUrl, // use the value from constructor
+            userId: widget.userId,
+          ),
         ),
       ),
     );

@@ -18,12 +18,10 @@ Future<void> initializeNotifications() async {
 
   await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
-  // Initialize timezone data
   tz.initializeTimeZones();
 }
 
-Future<void> scheduleNotification(
-    String taskName, DateTime scheduledTime) async {
+Future<void> scheduleNotification(String taskName, DateTime scheduledTime) async {
   final tzScheduled = tz.TZDateTime.from(scheduledTime, tz.local);
 
   const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
@@ -37,19 +35,21 @@ Future<void> scheduleNotification(
   const NotificationDetails platformDetails =
       NotificationDetails(android: androidDetails);
 
-  await flutterLocalNotificationsPlugin.zonedSchedule(
-    scheduledTime.millisecondsSinceEpoch,
-    'Plant Task Reminder',
-    taskName,
-    tzScheduled,
-    platformDetails,
-    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-    payload: 'task_reminder',
-    matchDateTimeComponents: DateTimeComponents.time, // optional
-  );
+  try {
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      scheduledTime.millisecondsSinceEpoch, // unique id
+      'Plant Task Reminder',
+      taskName,
+      tzScheduled,
+      platformDetails,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      payload: 'task_reminder',
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
+  } catch (e) {
+    print("Error scheduling notification: $e");
+  }
 }
-
-// --- ScheduleTaskForm: The widget that renders the form on the page ---
 
 class ScheduleTaskForm extends StatefulWidget {
   final void Function(PlantTask) onTaskAdded;
@@ -81,7 +81,6 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
   }
 
   Future<void> _pickDateTime() async {
-    // 1️⃣ Date picker
     final pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now().add(const Duration(days: 1)),
@@ -90,7 +89,6 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
     );
 
     if (pickedDate != null) {
-      // 2️⃣ Time picker
       final pickedTime = await showTimePicker(
         context: context,
         initialTime: const TimeOfDay(hour: 9, minute: 0),
@@ -114,16 +112,13 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
     if (!_formKey.currentState!.validate()) return;
     if (_taskDateTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Please select a date and time for the task.')),
+        const SnackBar(content: Text('Please select a date and time for the task.')),
       );
       return;
     }
 
     _formKey.currentState!.save();
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     final formattedTime =
         "${_taskDateTime!.year}-${_taskDateTime!.month.toString().padLeft(2, '0')}-${_taskDateTime!.day.toString().padLeft(2, '0')} "
@@ -137,31 +132,42 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
       time: formattedTime,
     );
 
-    // 1️⃣ FRONTEND SAVE: Update local list and schedule notification
-    widget.onTaskAdded(newTask);
-    await scheduleNotification(_taskName, _taskDateTime!);
+    print("Saving task: $_taskName for plant: $_plantName at $_taskDateTime");
 
+    // FRONTEND SAVE
+    widget.onTaskAdded(newTask);
+
+    // Schedule Notification (non-blocking)
+    try {
+      await scheduleNotification(_taskName, _taskDateTime!);
+      print("Notification scheduled for $_taskName at $_taskDateTime");
+    } catch (e) {
+      print("Notification error: $e");
+    }
+
+    // BACKEND SAVE
     bool backendSuccess = true;
     String message = 'Task saved successfully.';
 
-    // 2️⃣ BACKEND SAVE: Send to server (Persistence)
     if (widget.backendUrl.isNotEmpty && widget.userId != null) {
       try {
-        final response = await http.post(
-          Uri.parse('${widget.backendUrl}/tasks'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'userId': widget.userId,
-            'plantName': _plantName,
-            'task': _taskName,
-            'time': formattedTime,
-          }),
-        );
+        final response = await http
+            .post(
+              Uri.parse('${widget.backendUrl}/tasks'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'userId': widget.userId,
+                'plantName': _plantName,
+                'task': _taskName,
+                'time': formattedTime,
+              }),
+            )
+            .timeout(const Duration(seconds: 10));
 
         if (response.statusCode < 200 || response.statusCode >= 300) {
           backendSuccess = false;
           message = 'Task saved locally, but failed to sync to server.';
-          print('Backend post failed with status: ${response.statusCode}');
+          print('Backend post failed: ${response.statusCode}');
         }
       } catch (e) {
         backendSuccess = false;
@@ -170,9 +176,8 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
       }
     }
 
-    setState(() {
-      _isLoading = false;
-    });
+    if (!mounted) return;
+    setState(() => _isLoading = false);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -202,8 +207,6 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 30),
-
-            // Plant Name Input
             TextFormField(
               decoration: InputDecoration(
                 labelText: 'Enter Plant Name',
@@ -216,8 +219,6 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
                   value!.isEmpty ? 'Please enter a plant name' : null,
             ),
             const SizedBox(height: 15),
-
-            // Task Name Input
             TextFormField(
               decoration: InputDecoration(
                 labelText: 'Task Name',
@@ -230,8 +231,6 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
                   value!.isEmpty ? 'Please enter a task name' : null,
             ),
             const SizedBox(height: 15),
-
-            // Select Date & Time Row
             Row(
               children: [
                 Expanded(
@@ -258,8 +257,6 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
               ],
             ),
             const SizedBox(height: 30),
-
-            // Save Task Button
             ElevatedButton(
               onPressed: _isLoading ? null : _saveTask,
               style: ElevatedButton.styleFrom(
@@ -281,49 +278,6 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// -------------------------------------------------------------
-// ORIGINAL ScheduleTask CLASS (Kept for compatibility)
-// -------------------------------------------------------------
-
-class ScheduleTask {
-  Future<void> navigateToScheduleTaskPage(
-    BuildContext context,
-    void Function(PlantTask) onTaskAdded,
-    String backendUrl,
-    String? userId,
-  ) async {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(title: const Text('Schedule Plant Care Task')),
-          body: ScheduleTaskForm(
-            onTaskAdded: onTaskAdded,
-            backendUrl: backendUrl,
-            userId: userId,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget buildScheduleTaskButton(BuildContext context,
-      void Function(PlantTask) onTaskAdded, String backendUrl, String? userId) {
-    return ElevatedButton.icon(
-      onPressed: () =>
-          navigateToScheduleTaskPage(context, onTaskAdded, backendUrl, userId),
-      icon:
-          const Icon(Icons.check_circle_outline, size: 20, color: Colors.white),
-      label: const Text('Schedule a New Care Task'),
-      style: ElevatedButton.styleFrom(
-        foregroundColor: Colors.white,
-        backgroundColor: const Color.fromARGB(255, 77, 161, 56),
-        padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
       ),
     );
   }

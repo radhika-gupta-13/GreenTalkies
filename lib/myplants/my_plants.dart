@@ -7,7 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'plants_detail.dart';
 import 'add_plant.dart';
-
 import '../models/plant.dart';
 
 // =======================================================
@@ -29,48 +28,44 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
   bool hasError = false;
   String? backendUrl;
 
-
   @override
   void initState() {
     super.initState();
-    _initBackendUrl();
+    _initializeScreen();
   }
 
-  // ==================== Dynamic IP Fetch ====================
-  Future<void> _initBackendUrl() async {
+  /// ==================== Initialize backend URL and fetch plants ====================
+  Future<void> _initializeScreen() async {
+    setState(() {
+      isLoading = true;
+      hasError = false;
+    });
+
     try {
+      // 1️⃣ Get device Wi-Fi IP
       final info = NetworkInfo();
       final wifiIP = await info.getWifiIP();
+      if (wifiIP == null) throw Exception("Wi-Fi IP not found");
 
-      if (wifiIP != null) {
-        setState(() {
-          backendUrl = 'http://$wifiIP:4000';
-        });
-        _fetchPlants();
-      } else {
-        print('❌ Could not get Wi-Fi IP address');
-        setState(() {
-          hasError = true;
-          isLoading = false;
-        });
-      }
+      backendUrl = 'http://$wifiIP:4000';
+
+      // 2️⃣ Fetch plants from backend
+      await _fetchPlants();
     } catch (e) {
-      print('❌ Error fetching IP: $e');
+      print("❌ Error initializing MyPlantsScreen: $e");
       setState(() {
         hasError = true;
+      });
+    } finally {
+      setState(() {
         isLoading = false;
       });
     }
   }
 
-  // ==================== Fetch Plants from Backend ====================
+  /// ==================== Fetch Plants ====================
   Future<void> _fetchPlants() async {
     if (backendUrl == null) return;
-
-    setState(() {
-      isLoading = true;
-      hasError = false;
-    });
 
     try {
       final response = await http
@@ -83,9 +78,10 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
         final List data = jsonDecode(response.body);
         setState(() {
           _plants = data.map((p) => Plant.fromJson(p)).toList();
+          hasError = false;
         });
       } else {
-        print('❌ Failed with status ${response.statusCode}: ${response.body}');
+        print('❌ Failed with status ${response.statusCode}');
         setState(() {
           hasError = true;
         });
@@ -95,10 +91,6 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
       setState(() {
         hasError = true;
       });
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
     }
   }
 
@@ -106,57 +98,15 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
     await _fetchPlants();
   }
 
+  /// ==================== UI BUILD ====================
   @override
   Widget build(BuildContext context) {
-    if (backendUrl == null && !hasError) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
     if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+          body: Center(child: CircularProgressIndicator()));
     }
 
-    if (hasError) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'My Plants',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 22,
-            ),
-          ),
-          backgroundColor: GTColors.lushGreen,
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 60,
-                color: Colors.redAccent,
-              ),
-              const SizedBox(height: 15),
-              const Text(
-                'Unable to connect to backend 🌧\nCheck your Wi-Fi connection',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _initBackendUrl,
-                child: const Text('Retry'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: GTColors.lushGreen,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    if (hasError) return _buildErrorScreen();
 
     return Scaffold(
       backgroundColor: GTColors.secondaryBaseLight,
@@ -174,56 +124,7 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _refreshPlants,
-        child: _plants.isEmpty
-            ? ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: const [
-                  SizedBox(height: 200),
-                  Center(
-                    child: Text(
-                      'No plants yet 🌱\nTap below to add one!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            : ListView.builder(
-                padding: const EdgeInsets.all(20),
-                itemCount: _plants.length,
-                itemBuilder: (context, index) {
-                  final plant = _plants[index];
-                  return GestureDetector(
-                    onTap: () {
-                      if (backendUrl != null) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => PlantDetailScreen(
-                              plantId: plant.id,
-                              backendUrl: backendUrl!,
-                            ),
-                          ),
-                        ).then((_) => _refreshPlants());
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content:
-                                  Text('Backend URL not available, try again')),
-                        );
-                      }
-                    },
-                    child: PlantListCard(
-                      plant: plant,
-                      backendUrl: backendUrl ?? '',
-                      onPhotoUpdated: _refreshPlants,
-                    ),
-                  );
-                },
-              ),
+        child: _plants.isEmpty ? _buildEmptyScreen() : _buildPlantsList(),
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: GTColors.radiantGreen,
@@ -241,7 +142,7 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
             MaterialPageRoute(
               builder: (_) => AddPlantScreen(
                 userId: widget.userId,
-                backendUrl: backendUrl!, // Pass the backend URL here
+                backendUrl: backendUrl!,
               ),
             ),
           );
@@ -252,6 +153,106 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
         },
         child: const Icon(Icons.add),
       ),
+    );
+  }
+
+  /// ==================== Error Screen ====================
+  Widget _buildErrorScreen() {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'My Plants',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
+        ),
+        backgroundColor: GTColors.lushGreen,
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 60,
+              color: Colors.redAccent,
+            ),
+            const SizedBox(height: 15),
+            const Text(
+              'Unable to connect to backend 🌧\nCheck your Wi-Fi connection',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: _initializeScreen,
+              child: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GTColors.lushGreen,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// ==================== Empty Screen ====================
+  Widget _buildEmptyScreen() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: const [
+        SizedBox(height: 200),
+        Center(
+          child: Text(
+            'No plants yet 🌱\nTap below to add one!',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// ==================== Plants List ====================
+  Widget _buildPlantsList() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: _plants.length,
+      itemBuilder: (context, index) {
+        final plant = _plants[index];
+        return GestureDetector(
+          onTap: () {
+            if (backendUrl != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PlantDetailScreen(
+                    plantId: plant.id,
+                    backendUrl: backendUrl!,
+                  ),
+                ),
+              ).then((_) => _refreshPlants());
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content:
+                        Text('Backend URL not available, try again')),
+              );
+            }
+          },
+          child: PlantListCard(
+            plant: plant,
+            backendUrl: backendUrl ?? '',
+            onPhotoUpdated: _refreshPlants,
+          ),
+        );
+      },
     );
   }
 }
@@ -306,9 +307,10 @@ class PlantListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageProvider = (plant.imageUrl != null && plant.imageUrl!.isNotEmpty)
-        ? NetworkImage(plant.imageUrl!) as ImageProvider
-        : const AssetImage('assets/default_plant.jpg');
+    final imageProvider =
+        (plant.imageUrl != null && plant.imageUrl!.isNotEmpty)
+            ? NetworkImage(plant.imageUrl!) as ImageProvider
+            : const AssetImage('assets/default_plant.jpg');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 15),

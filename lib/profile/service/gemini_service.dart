@@ -1,64 +1,73 @@
+import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:network_info_plus/network_info_plus.dart';
 
 class GeminiService {
-  late String baseUrl; // initialize later
-  final String? backendUrl;
+  final String baseUrl = "http://192.168.0.103:4000/api"; // your backend
 
-  GeminiService({this.backendUrl});
+  final ImagePicker _picker = ImagePicker();
 
-  /// Initialize base URL (call this before using the service)
-  Future<void> init() async {
-    if (backendUrl != null) {
-      baseUrl = backendUrl!;
-    } else {
-      baseUrl = await _getAutoBaseUrl();
+  // ---------------------------
+  // Pick Image from Gallery
+  // ---------------------------
+  Future<File?> pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image == null) return null;
+    return File(image.path);
+  }
+
+  // ---------------------------
+  // Helper: Send request to backend
+  // ---------------------------
+  Future<Map<String, dynamic>> _sendRequest(
+      String endpoint, File? image, {String? manualQuery}) async {
+    final uri = Uri.parse("$baseUrl/$endpoint");
+
+    var request = http.MultipartRequest('POST', uri);
+
+    if (image != null) {
+      request.files.add(await http.MultipartFile.fromPath('image', image.path));
     }
-  }
 
-  String get apiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
+    if (manualQuery != null && manualQuery.isNotEmpty) {
+      request.fields['manualQuery'] = manualQuery;
+    }
 
-  static Future<String> _getAutoBaseUrl() async {
-    final info = NetworkInfo();
-    String? ip = await info.getWifiIP(); // get device IP
-    ip ??= '192.168.0.103'; // fallback
-    return 'http://$ip:4000/api';
-  }
-
-  Future<String> identifyPlant(XFile imageFile) async {
-    final uri = Uri.parse('$baseUrl/identify');
-    final request = http.MultipartRequest('POST', uri);
-    request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
-    if (apiKey.isNotEmpty) request.headers['x-api-key'] = apiKey;
-
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(responseBody);
-      return data['result'] ?? 'No result found';
+      final Map<String, dynamic> decoded = jsonDecode(response.body);
+      // always return a Map with 'diagnosis'
+      return Map<String, dynamic>.from(decoded);
     } else {
-      throw Exception('Failed to identify plant: ${response.statusCode} - $responseBody');
+      throw Exception(
+          'Server error: ${response.statusCode} ${response.reasonPhrase}');
     }
   }
 
-  Future<String> diagnosePlant(XFile imageFile) async {
-    final uri = Uri.parse('$baseUrl/diagnose');
-    final request = http.MultipartRequest('POST', uri);
-    request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
-    if (apiKey.isNotEmpty) request.headers['x-api-key'] = apiKey;
+  // ---------------------------
+  // Identify Plant
+  // ---------------------------
+  Future<Map<String, dynamic>> identifyPlant(File? image,
+      {String? manualQuery}) async {
+    return await _sendRequest('diagnose', image, manualQuery: manualQuery);
+  }
 
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
+  // ---------------------------
+  // Diagnose Plant
+  // ---------------------------
+  Future<Map<String, dynamic>> diagnosePlant(File? image,
+      {String? manualQuery}) async {
+    return await _sendRequest('diagnose', image, manualQuery: manualQuery);
+  }
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(responseBody);
-      return data['diagnosis'] ?? 'No diagnosis found';
-    } else {
-      throw Exception('Failed to diagnose plant: ${response.statusCode} - $responseBody');
-    }
+  // ---------------------------
+  // Diagnose Soil
+  // ---------------------------
+  Future<Map<String, dynamic>> diagnoseSoil(File? image,
+      {String? manualQuery}) async {
+    return await _sendRequest('soil-diagnose', image, manualQuery: manualQuery);
   }
 }

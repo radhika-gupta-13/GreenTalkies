@@ -314,7 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       if (_userId != null) MyPlantsScreen(userId: _userId!) else Container(),
       GroveScreen(userId: _userId ?? '', username: _userName),
-      const BudBasketScreen(),
+      BudBasketScreen(userId: _userId ?? ''),
       ProfilePage(userId: _userId ?? ''),
     ];
 
