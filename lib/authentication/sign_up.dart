@@ -159,18 +159,25 @@ class _SignUpPageState extends State<SignUpPage> {
     return isValid;
   }
 
-  Future<void> signupUser(BuildContext context, String name, String email, String password) async {
+  Future<void> signupUser(
+      BuildContext context, String name, String email, String password) async {
     if (_backendIp == null) return;
+
     if (!_validateInputs(name, email, password)) return;
 
     setState(() => _isLoading = true);
+
     final url = Uri.parse('$_backendIp/signup');
 
     try {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'name': name, 'email': email, 'password': password}),
+        body: jsonEncode({
+          'displayName': name,
+          'email': email,
+          'password': password,
+        }),
       );
 
       final Map<String, dynamic> responseBody = jsonDecode(response.body);
@@ -180,13 +187,16 @@ class _SignUpPageState extends State<SignUpPage> {
           const SnackBar(content: Text("Signup successful!")),
         );
 
-        Navigator.pushReplacement(
+        // Navigate to HomeScreen and remove previous routes
+        Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()), // No gemini
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
         );
       } else {
         final message = responseBody['message'] ?? "Signup failed.";
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
       }
     } catch (error) {
       ScaffoldMessenger.of(context)
@@ -203,9 +213,10 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   void _continueWithoutSignup() {
-    Navigator.pushReplacement(
+    Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()), // No gemini
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false,
     );
   }
 

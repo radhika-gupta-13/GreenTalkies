@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:greentalkies/colors.dart';
 import 'package:greentalkies/models/fertilzer_model.dart';
+import 'package:greentalkies/models/product_model.dart';
 import 'package:greentalkies/bud & basket/fertilizer_service.dart';
+import 'package:greentalkies/bud & basket/widgets/product_card_list.dart';
+import 'package:greentalkies/bud & basket/widgets/product_details.dart'; // ProductDetailPage
 
 class FertilizerListScreen extends StatefulWidget {
-  const FertilizerListScreen({super.key});
+  final String userId;
+
+  const FertilizerListScreen({super.key, required this.userId});
 
   @override
   State<FertilizerListScreen> createState() => _FertilizerListScreenState();
@@ -18,6 +23,19 @@ class _FertilizerListScreenState extends State<FertilizerListScreen> {
   void initState() {
     super.initState();
     _futureFertilizers = _service.fetchFertilizers();
+  }
+
+  // Convert Fertilizer to Product
+  List<Product> _convertToProducts(List<Fertilizer> fertilizers) {
+    return fertilizers
+        .map((f) => Product(
+              id: f.id,
+              name: f.name,
+              description: f.description,
+              price: f.price,
+              imageUrl: f.imageUrl,
+            ))
+        .toList();
   }
 
   @override
@@ -42,10 +60,13 @@ class _FertilizerListScreenState extends State<FertilizerListScreen> {
           }
 
           final fertilizers = snapshot.data!;
+          final products = _convertToProducts(fertilizers);
+
+          // Use GridView with ProductCard for full grid layout
           return Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(10.0),
             child: GridView.builder(
-              itemCount: fertilizers.length,
+              itemCount: products.length,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: 10,
@@ -53,66 +74,19 @@ class _FertilizerListScreenState extends State<FertilizerListScreen> {
                 childAspectRatio: 0.70,
               ),
               itemBuilder: (context, index) {
-                final item = fertilizers[index];
-                return Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
+                final product = products[index];
+                return ProductCard(
+                  product: product,
+                  userId: widget.userId,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ProductDetailPage(product: product, userId: widget.userId),
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(20),
-                          topRight: Radius.circular(20),
-                        ),
-                        child: Image.asset(
-                          item.imageUrl,
-                          height: 120,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(10.0),
-                          child: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(item.name,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                        color: GTColors.darkText),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis),
-                                const SizedBox(height: 5),
-                                Text(item.description,
-                                    style: const TextStyle(
-                                        color: Colors.black54, fontSize: 12),
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis),
-                                const SizedBox(height: 8),
-                                Text('₹${item.price}',
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: GTColors.lushGreen)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
             ),

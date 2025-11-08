@@ -3,7 +3,9 @@ import 'package:greentalkies/colors.dart';
 import 'fertilizer_list_screen.dart';
 
 class HighlightBanner extends StatelessWidget {
-  const HighlightBanner({super.key});
+  final String userId; // ✅ add userId
+
+  const HighlightBanner({super.key, required this.userId});
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +15,9 @@ class HighlightBanner extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const FertilizerListScreen()),
+            MaterialPageRoute(
+              builder: (_) => FertilizerListScreen(userId: userId), // pass userId
+            ),
           );
         },
         child: Container(
@@ -41,7 +45,10 @@ class HighlightBanner extends StatelessWidget {
                 children: [
                   Text(
                     'Organic Fertilizers',
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 5),
                   Text(
@@ -50,7 +57,8 @@ class HighlightBanner extends StatelessWidget {
                   ),
                 ],
               ),
-              Icon(Icons.spa_rounded, color: Colors.white.withOpacity(0.8), size: 40),
+              Icon(Icons.spa_rounded,
+                  color: Colors.white.withOpacity(0.8), size: 40),
             ],
           ),
         ),

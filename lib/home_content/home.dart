@@ -34,15 +34,13 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = false;
   String _errorMessage = '';
   String? _backendIp;
-  final String backendUrl = RuntimeConfig().backendUrl;
   String _userName = '';
   String? _userId;
 
   // Impact metrics
   int _plantsPlanted = 0;
-  int _tasksCompleted = 0;
   double _co2Absorbed = 0.0;
-  int _communityPosts = 0; // Added
+  int _communityPosts = 0;
 
   final List<Color> _taskCardColors = [
     colors.GTColors.skyBlue,
@@ -61,8 +59,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _initApp() async {
     await _setBackendIp();
     await _loadUserId();
-    await _fetchTasks();
-    await _fetchImpactMetrics();
+
+    if (_userId != null) {
+      await _fetchTasks();
+      await _fetchImpactMetrics();
+    }
   }
 
   Future<void> _setBackendIp() async {
@@ -83,7 +84,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     _userId = prefs.getString('userId');
     loggedInUserId = _userId;
+
     if (_userId != null) await _fetchUserName(_userId!);
+    setState(() {});
   }
 
   Future<void> _fetchUserName(String userId) async {
@@ -126,13 +129,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        final List<PlantTask> fetchedTasks = data
-            .map((e) => PlantTask.fromJson(e))
-            .toList();
-
-        print(
-          '✅ Fetched tasks: ${fetchedTasks.map((t) => t.plantName).toList()}',
-        );
+        final List<PlantTask> fetchedTasks =
+            data.map((e) => PlantTask.fromJson(e)).toList();
 
         setState(() {
           _careTasks = fetchedTasks;
@@ -153,90 +151,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _addTask(PlantTask task) async {
-    if (_backendIp == null || _userId == null) return;
-
-    try {
-      final url = Uri.parse('$_backendIp/tasks');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'userId': _userId,
-          'plantName': task.plantName,
-          'task': task.task,
-          'time': task.time,
-        }),
-      );
-
-      if (response.statusCode == 201) {
-        final Map<String, dynamic> responseBody = jsonDecode(response.body);
-        final Map<String, dynamic> newTaskJson = responseBody['task'];
-        final PlantTask newTask = PlantTask.fromJson(newTaskJson);
-
-        setState(() {
-          _careTasks.add(newTask);
-        });
-
-        print('✅ Task added: ${newTask.plantName}');
-        await _fetchImpactMetrics(); // update metrics immediately
-      } else {
-        print('❌ Failed to add task: ${response.body}');
-      }
-    } catch (e) {
-      print('❌ Error adding task: $e');
-    }
-  }
-
-  Future<void> _completeTask(PlantTask task) async {
-    setState(() => _careTasks.remove(task));
-
-    if (_backendIp == null || task.id.isEmpty) return;
-
-    try {
-      final url = Uri.parse('$_backendIp/tasks/${task.id}');
-      final response = await http.delete(url);
-      if (response.statusCode != 200) {
-        print('❌ Failed to complete task: ${response.body}');
-      } else {
-        await _fetchImpactMetrics(); // update metrics immediately
-      }
-    } catch (e) {
-      print('❌ Error completing task: $e');
-    }
-  }
-
-  Future<void> _snoozeTask(PlantTask task) async {
-    final newTime = 'Tomorrow 9:00 AM';
-    final updatedTask = task.snooze(newTime);
-
-    setState(() {
-      final index = _careTasks.indexOf(task);
-      if (index != -1) _careTasks[index] = updatedTask;
-    });
-
-    if (_backendIp == null || task.id.isEmpty) return;
-
-    try {
-      final url = Uri.parse('$_backendIp/tasks/${task.id}/status');
-      final response = await http.patch(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'time': newTime, 'status': 'snoozed'}),
-      );
-      if (response.statusCode != 200) {
-        print('❌ Failed to snooze task: ${response.body}');
-      } else {
-        await _fetchImpactMetrics(); // update metrics immediately
-      }
-    } catch (e) {
-      print('❌ Error snoozing task: $e');
-    }
-  }
-
-  // -----------------------------
-  // Fetch impact metrics from backend
-  // -----------------------------
   Future<void> _fetchImpactMetrics() async {
     if (_backendIp == null || _userId == null) return;
 
@@ -248,14 +162,12 @@ class _HomeScreenState extends State<HomeScreen> {
         final data = jsonDecode(response.body);
         setState(() {
           _plantsPlanted = data['plantsPlanted'] ?? 0;
-          _tasksCompleted = data['tasksCompleted'] ?? 0;
           _co2Absorbed = (data['co2Absorbed'] ?? 0.0).toDouble();
-          _communityPosts = data['communityPosts'] ?? 0; // Added
+          _communityPosts = data['communityPosts'] ?? 0;
         });
       } else {
         print(
-          '❌ Failed to fetch impact metrics, status: ${response.statusCode}',
-        );
+            '❌ Failed to fetch impact metrics, status: ${response.statusCode}');
       }
     } catch (e) {
       print('❌ Error fetching impact metrics: $e');
@@ -271,9 +183,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // -----------------------------
-  // Open Schedule Task Page
-  // -----------------------------
   void _openScheduleTaskPage() {
     if (_backendIp == null || _userId == null) return;
 
@@ -281,41 +190,45 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(
         builder: (_) =>
-            ScheduleTaskAutoOpenPage(backendUrl: _backendIp!, userId: _userId),
+            ScheduleTaskAutoOpenPage(backendUrl: _backendIp!, userId: _userId!),
       ),
     ).then((_) async {
-      await _fetchTasks(); // refresh tasks after returning
-      await _fetchImpactMetrics(); // refresh metrics after returning
+      await _fetchTasks();
+      await _fetchImpactMetrics();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_userId == null) {
+      return const Scaffold(
+          body: Center(child: CircularProgressIndicator()));
+    }
+
     final List<Widget> _widgetOptions = [
       _HomeContent(
         userName: _userName,
         careTasks: _careTasks,
         isLoading: _isLoading,
         errorMessage: _errorMessage,
-        onTaskCompleted: _completeTask,
-        onTaskSnoozed: _snoozeTask,
-        onTaskAdded: _addTask,
+        onTaskCompleted: (task) {}, // implement as needed
+        onTaskSnoozed: (task) {}, // implement as needed
+        onTaskAdded: (task) {}, // implement as needed
         onRefresh: () async {
           await _fetchTasks();
           await _fetchImpactMetrics();
         },
-        userId: _userId,
+        userId: _userId!,
         backendUrl: _backendIp ?? '',
         taskCardColors: _taskCardColors,
         plantsPlanted: _plantsPlanted,
-        tasksCompleted: _tasksCompleted,
         co2Absorbed: _co2Absorbed,
         communityPosts: _communityPosts,
       ),
-      if (_userId != null) MyPlantsScreen(userId: _userId!) else Container(),
-      GroveScreen(userId: _userId ?? '', username: _userName),
-      BudBasketScreen(userId: _userId ?? ''),
-      ProfilePage(userId: _userId ?? ''),
+      MyPlantsScreen(userId: _userId!),
+      GroveScreen(userId: _userId!, username: _userName),
+      BudBasketScreen(userId: _userId!),
+      ProfilePage(userId: _userId!),
     ];
 
     return Scaffold(
@@ -404,14 +317,13 @@ class _HomeContent extends StatelessWidget {
   final bool isLoading;
   final String errorMessage;
   final Function() onRefresh;
-  final String? userId;
+  final String userId;
   final String backendUrl;
   final List<Color> taskCardColors;
 
   final int plantsPlanted;
-  final int tasksCompleted;
   final double co2Absorbed;
-  final int communityPosts; // Added
+  final int communityPosts;
 
   const _HomeContent({
     required this.userName,
@@ -426,9 +338,8 @@ class _HomeContent extends StatelessWidget {
     required this.backendUrl,
     required this.taskCardColors,
     required this.plantsPlanted,
-    required this.tasksCompleted,
     required this.co2Absorbed,
-    required this.communityPosts, // Added
+    required this.communityPosts,
   });
 
   @override
@@ -458,11 +369,29 @@ class _HomeContent extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // ✅ Identify / Diagnose button
-            Center(child: _buildIdentifyButton(context)),
+            // Identify / Diagnose button
+            Center(
+              child: ElevatedButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => IdentifyDiagnosePage(),
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+                child: const Text(
+                  'Identify / Diagnose',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              ),
+            ),
             const SizedBox(height: 20),
 
-            // ✅ Care Cards / Scheduled Tasks
+            // Care Tasks
             Text(
               'Your Care Tasks',
               style: TextStyle(
@@ -471,9 +400,7 @@ class _HomeContent extends StatelessWidget {
                 color: colors.GTColors.primaryBaseDark,
               ),
             ),
-
             const SizedBox(height: 20),
-
             if (isLoading)
               const Center(child: CircularProgressIndicator())
             else if (errorMessage.isNotEmpty)
@@ -505,7 +432,7 @@ class _HomeContent extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-            // ✅ Impact Metrics
+            // Impact Metrics
             Text(
               'Your Green Impact',
               style: TextStyle(
@@ -515,7 +442,6 @@ class _HomeContent extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 30),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -545,32 +471,9 @@ class _HomeContent extends StatelessWidget {
       ),
     );
   }
-
-  Widget _buildIdentifyButton(BuildContext context) {
-    return ElevatedButton(
-      onPressed: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => IdentifyDiagnosePage(
-            // gemini: null, // Pass your GeminiService instance if needed
-          ),
-        ),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.green,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      ),
-      child: const Text(
-        'Identify / Diagnose',
-        style: TextStyle(color: Colors.white, fontSize: 16),
-      ),
-    );
-  }
 }
 
-// -----------------------------
 // Impact Metric Widget
-// -----------------------------
 class ImpactMetric extends StatelessWidget {
   final String value;
   final String label;
@@ -615,9 +518,7 @@ class ImpactMetric extends StatelessWidget {
   }
 }
 
-// -----------------------------
 // Bottom Navigation
-// -----------------------------
 class GreenTalkiesBottomNavBar extends StatelessWidget {
   final int selectedIndex;
   final Function(int) onItemTapped;

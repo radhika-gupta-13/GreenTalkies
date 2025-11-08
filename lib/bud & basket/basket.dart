@@ -6,14 +6,17 @@ import 'widgets/category_grid.dart';
 import 'widgets/product_card_list.dart';
 import 'widgets/highlight_banner.dart';
 import 'widgets/image_carousel.dart';
-import 'widgets/cart_icon_with_badge.dart';
 import 'widgets/collection_list.dart';
 import 'widgets/product_dummy.dart';
+import 'widgets/current_orders.dart';
+import 'widgets/previous_orders.dart';
+import 'widgets/wishlist.dart';
+import 'widgets/cart_screen.dart';
 
 class BudBasketScreen extends StatelessWidget {
-  final String userId; // ✅ added userId
+  final String userId; // required
 
-  BudBasketScreen({super.key, required this.userId});
+  const BudBasketScreen({super.key, required this.userId});
 
   // SnackBar helper
   void _showSnackbar(BuildContext context, String message) {
@@ -42,6 +45,22 @@ class BudBasketScreen extends StatelessWidget {
     );
   }
 
+  // Side menu (Drawer) items
+  Widget _buildDrawerItem(
+      BuildContext context, IconData icon, String title, Widget destination) {
+    return ListTile(
+      leading: Icon(icon, color: GTColors.lushGreen),
+      title: Text(title),
+      onTap: () {
+        Navigator.pop(context); // Close the bottom sheet
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => destination),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,9 +79,37 @@ class BudBasketScreen extends StatelessWidget {
         toolbarHeight: 80,
         actions: [
           IconButton(
-            icon: const CartIconWithBadge(itemCount: 3),
-            onPressed: () =>
-                _showSnackbar(context, 'Navigating to Shopping Cart...'),
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                shape: const RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                builder: (_) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildDrawerItem(context, Icons.favorite, 'Wishlist',
+                            WishlistScreen(userId: userId)),
+                        _buildDrawerItem(context, Icons.shopping_cart, 'Cart',
+                            CartScreen(userId: userId)),
+                        _buildDrawerItem(context, Icons.history, 'Previous Orders',
+                            PreviousOrdersScreen(userId: userId)),
+                        _buildDrawerItem(
+                            context,
+                            Icons.pending_actions,
+                            'Current Orders',
+                            CurrentOrdersScreen(userId: userId)),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
           ),
           const SizedBox(width: 10),
         ],
@@ -74,7 +121,7 @@ class BudBasketScreen extends StatelessWidget {
           children: <Widget>[
             // 🔍 Search Bar
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 5),
+              margin: const EdgeInsets.symmetric(vertical: 5),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -119,7 +166,7 @@ class BudBasketScreen extends StatelessWidget {
             _buildSectionHeader(context, 'Shop by Category',
                 () => _showSnackbar(context, 'View all categories')),
             const SizedBox(height: 15),
-            CategoryGrid(userId: userId), // ✅ pass userId
+            CategoryGrid(userId: userId),
             const SizedBox(height: 30),
 
             // 🌱 Today's Green Deals
@@ -128,12 +175,12 @@ class BudBasketScreen extends StatelessWidget {
             const SizedBox(height: 15),
             ProductCardList(
               products: allProducts,
-              userId: userId, // ✅ pass userId
+              userId: userId,
             ),
             const SizedBox(height: 30),
 
             // 🏷 Highlighted Banner
-            const HighlightBanner(),
+            HighlightBanner(userId: userId),
             const SizedBox(height: 30),
 
             // 🎞 Explore Collections
@@ -145,8 +192,10 @@ class BudBasketScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) =>
-                        CollectionListScreen(collectionTitle: title),
+                    builder: (_) => CollectionListScreen(
+                      collectionTitle: title,
+                      userId: userId,
+                    ),
                   ),
                 );
               },

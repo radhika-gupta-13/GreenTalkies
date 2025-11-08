@@ -31,3 +31,17 @@ class RuntimeConfig {
 
   Environment get environment => _environment;
 }
+
+class AppConfig {
+  // Toggle this to false for local dev, true for production APK
+  static const bool isProduction = true;
+
+  // Backend URL
+  static String get backendUrl {
+    if (isProduction) {
+      return "https://your-production-backend.com"; // <-- replace with your hosted server
+    } else {
+      return "http://10.0.2.2:4000"; // Local dev/emulator
+    }
+  }
+}

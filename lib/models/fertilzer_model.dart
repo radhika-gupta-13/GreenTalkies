@@ -15,11 +15,13 @@ class Fertilizer {
 
   factory Fertilizer.fromJson(Map<String, dynamic> json) {
     return Fertilizer(
-      id: json['_id'] ?? '',
-      name: json['name'] ?? '',
-      description: json['description'] ?? '',
-      price: (json['price'] as num).toDouble(),
-      imageUrl: json['imageUrl'] ?? '',
+      id: json['_id'] != null ? json['_id'] as String : '',
+      name: json['name'] != null ? json['name'] as String : 'Unknown Fertilizer',
+      description: json['description'] != null ? json['description'] as String : '',
+      price: (json['price'] != null) ? (json['price'] as num).toDouble() : 0.0,
+      imageUrl: json['imageUrl'] != null && (json['imageUrl'] as String).isNotEmpty
+          ? json['imageUrl'] as String
+          : 'assets/default_image.png',
     );
   }
 }
