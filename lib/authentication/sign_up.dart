@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-import 'package:greentalkies/config.dart';
-import 'package:flutter/foundation.dart'; // for kIsWeb
-import 'package:network_info_plus/network_info_plus.dart'; // for local IP
-import '../home_content/home.dart'; // Import HomeScreen
+import 'package:flutter/foundation.dart';
+import '../home_content/home.dart';
+import '../backend_helper.dart'; 
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -18,36 +17,37 @@ class _SignUpPageState extends State<SignUpPage> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final String backendUrl = RuntimeConfig().backendUrl;
 
   bool _isLoading = false;
-  String? _backendIp;
+  String? _backendUrl;
 
-  // Error + availability messages
   String? nameError;
   String? emailError;
   String? passwordError;
-  String? nameAvailability; // Available /  Taken
+  String? nameAvailability;
 
-  // Password strength
   double passwordStrength = 0;
   String passwordStrengthLabel = '';
   bool _obscurePassword = true;
 
-  Timer? _debounce; // For debounced username check
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    _setBackendIp();
-
+    _resolveBackendUrl();
     passwordController.addListener(() {
       _checkPasswordStrength(passwordController.text);
     });
-
     nameController.addListener(() {
       _onUsernameChanged(nameController.text);
     });
+  }
+
+  Future<void> _resolveBackendUrl() async {
+    final helper = BackendHelper();
+    _backendUrl = await helper.getBackendUrl();
+    setState(() {});
   }
 
   @override
@@ -56,52 +56,34 @@ class _SignUpPageState extends State<SignUpPage> {
     super.dispose();
   }
 
-  Future<void> _setBackendIp() async {
-    if (kIsWeb) {
-      _backendIp = 'http://localhost:4000';
-    } else {
-      final info = NetworkInfo();
-      String? wifiIp = await info.getWifiIP();
-      _backendIp = wifiIp != null ? 'http://$wifiIp:4000' : 'http://10.0.2.2:4000';
-    }
-    setState(() {});
-  }
-
   void _onUsernameChanged(String username) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 800), () {
-      if (username.isNotEmpty) {
+      if (username.isNotEmpty && _backendUrl != null) {
         _checkUsernameAvailability(username);
-      } else {
-        setState(() {
-          nameAvailability = null;
-          nameError = null;
-        });
       }
     });
   }
 
   Future<void> _checkUsernameAvailability(String username) async {
-    if (_backendIp == null) return;
-
     try {
-      final url = Uri.parse('$_backendIp/check-username/$username');
+      final url = Uri.parse('$_backendUrl/check-username/$username');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
         bool available = result['available'];
         setState(() {
-          if (available) {
-            nameAvailability = "✅ Username available";
-            nameError = null;
-          } else {
-            nameAvailability = "❌ Username already taken";
-            nameError = "Username already exists";
-          }
+          nameAvailability = available
+              ? "✅ Username available"
+              : "❌ Username already taken";
         });
+      } else {
+        setState(() => nameAvailability = null);
       }
-    } catch (e) {}
+    } catch (e) {
+      debugPrint("⚠️ Username check error: $e");
+    }
   }
 
   void _checkPasswordStrength(String password) {
@@ -150,24 +132,22 @@ class _SignUpPageState extends State<SignUpPage> {
         passwordError = "Password must be at least 6 characters";
         isValid = false;
       }
-
-      if (nameError == null && nameAvailability == "❌ Username already taken") {
-        nameError = "Username already exists";
-        isValid = false;
-      }
     });
     return isValid;
   }
 
   Future<void> signupUser(
       BuildContext context, String name, String email, String password) async {
-    if (_backendIp == null) return;
+    if (_backendUrl == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Backend not ready")));
+      return;
+    }
 
     if (!_validateInputs(name, email, password)) return;
-
     setState(() => _isLoading = true);
 
-    final url = Uri.parse('$_backendIp/signup');
+    final url = Uri.parse('$_backendUrl/auth/signup'); 
 
     try {
       final response = await http.post(
@@ -180,23 +160,28 @@ class _SignUpPageState extends State<SignUpPage> {
         }),
       );
 
-      final Map<String, dynamic> responseBody = jsonDecode(response.body);
+      if (response.headers['content-type']?.contains('application/json') ?? false) {
+        final Map<String, dynamic> body = jsonDecode(response.body);
 
-      if (response.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Signup successful!")),
-        );
-
-        // Navigate to HomeScreen and remove previous routes
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (route) => false,
-        );
+        if (response.statusCode == 201) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Signup successful!")),
+          );
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+            (route) => false,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(body['message'] ?? "Signup failed.")),
+          );
+        }
       } else {
-        final message = responseBody['message'] ?? "Signup failed.";
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(message)));
+        debugPrint("⚠️ HTML or unexpected response: ${response.body}");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Server returned invalid response.")),
+        );
       }
     } catch (error) {
       ScaffoldMessenger.of(context)
@@ -264,7 +249,7 @@ class _SignUpPageState extends State<SignUpPage> {
               ),
             ),
 
-            // Form
+            // Form Section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 40),
               child: Container(
@@ -282,7 +267,6 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
                 child: Column(
                   children: [
-                    // Username
                     TextField(
                       controller: nameController,
                       decoration: InputDecoration(
@@ -297,7 +281,7 @@ class _SignUpPageState extends State<SignUpPage> {
                         errorText: nameError,
                       ),
                     ),
-                    if (nameAvailability != null && nameError == null)
+                    if (nameAvailability != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Align(
@@ -314,8 +298,6 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                       ),
                     const SizedBox(height: 20),
-
-                    // Email
                     TextField(
                       controller: emailController,
                       decoration: InputDecoration(
@@ -331,8 +313,6 @@ class _SignUpPageState extends State<SignUpPage> {
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    // Password
                     TextField(
                       controller: passwordController,
                       obscureText: _obscurePassword,
@@ -348,69 +328,55 @@ class _SignUpPageState extends State<SignUpPage> {
                         errorText: passwordError,
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
+                          onPressed: () =>
+                              setState(() => _obscurePassword = !_obscurePassword),
                         ),
                       ),
                     ),
                     const SizedBox(height: 8),
 
-                    // Password strength meter
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    // Password strength bar
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              flex: (passwordStrength * 100).toInt(),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                                height: 6,
-                                color: _getStrengthColor(),
-                              ),
-                            ),
-                            Expanded(
-                              flex: 100 - (passwordStrength * 100).toInt(),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                                height: 6,
-                                color: Colors.grey[300],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        AnimatedDefaultTextStyle(
-                          duration: const Duration(milliseconds: 300),
-                          style: TextStyle(
+                        Expanded(
+                          flex: (passwordStrength * 100).toInt(),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            height: 6,
                             color: _getStrengthColor(),
-                            fontWeight: FontWeight.bold,
                           ),
-                          child: Text(passwordStrengthLabel),
+                        ),
+                        Expanded(
+                          flex: 100 - (passwordStrength * 100).toInt(),
+                          child: Container(height: 6, color: Colors.grey[300]),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 25),
+                    const SizedBox(height: 4),
+                    Text(
+                      passwordStrengthLabel,
+                      style: TextStyle(
+                        color: _getStrengthColor(),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
 
-                    // Sign Up Button
+                    const SizedBox(height: 25),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: _isLoading
                             ? null
-                            : () {
-                                final name = nameController.text.trim();
-                                final email = emailController.text.trim();
-                                final password = passwordController.text.trim();
-                                signupUser(context, name, email, password);
-                              },
+                            : () => signupUser(
+                                  context,
+                                  nameController.text.trim(),
+                                  emailController.text.trim(),
+                                  passwordController.text.trim(),
+                                ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFC85C2C),
                           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -436,7 +402,6 @@ class _SignUpPageState extends State<SignUpPage> {
                               ),
                       ),
                     ),
-
                     const SizedBox(height: 15),
                     TextButton(
                       onPressed: () => Navigator.pop(context),
@@ -448,8 +413,6 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                       ),
                     ),
-
-                    // Continue without signing up
                     TextButton(
                       onPressed: _continueWithoutSignup,
                       child: const Text(
@@ -457,7 +420,6 @@ class _SignUpPageState extends State<SignUpPage> {
                         style: TextStyle(
                           color: Color(0xFF3C5C2B),
                           fontWeight: FontWeight.bold,
-                          decoration: TextDecoration.underline,
                         ),
                       ),
                     ),

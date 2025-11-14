@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+
 enum Environment {
-  dev,     // Local
-  ngrok,   // Temporary public
-  prod,    // Hosted
+  dev,     // Local (emulator or real device)
+  ngrok,   // Temporary public URL for testing
+  prod,    // Hosted backend
 }
 
 class RuntimeConfig {
@@ -12,19 +14,29 @@ class RuntimeConfig {
   factory RuntimeConfig() => _instance;
   RuntimeConfig._internal();
 
-  // Get current backend URL
+  // Detect platform (web, emulator, device)
+  bool get _isEmulator =>
+      !kIsWeb && (defaultTargetPlatform == TargetPlatform.android);
+
+  // ✅ Dynamically get backend URL
   String get backendUrl {
     switch (_environment) {
       case Environment.dev:
-        return "http://192.168.0.xxx:3000"; // Local backend
+        // Emulator = use 10.0.2.2, Real device = use WiFi IP
+        final localUrl = _isEmulator
+            ? "http://10.0.2.2:4000"
+            : "http://192.168.0.xxx:4000"; // replace with your PC IP
+        return localUrl;
+
       case Environment.ngrok:
-        return "https://abcd1234.ngrok.io"; // Ngrok URL
+        return "https://abcd1234.ngrok.io"; // <--- your ngrok tunnel
+
       case Environment.prod:
-        return "https://greentalkies-backend.up.railway.app"; // Hosted
+        return "https://greentalkies-backend.up.railway.app"; // hosted backend
     }
   }
 
-  // Change environment dynamically
+  // Allow dynamic switching
   void setEnvironment(Environment env) {
     _environment = env;
   }
@@ -32,16 +44,15 @@ class RuntimeConfig {
   Environment get environment => _environment;
 }
 
+// 🔧 Optional: Simple app-wide access
 class AppConfig {
-  // Toggle this to false for local dev, true for production APK
-  static const bool isProduction = true;
+  static const bool isProduction = false; // change for release builds
 
-  // Backend URL
   static String get backendUrl {
     if (isProduction) {
-      return "https://your-production-backend.com"; // <-- replace with your hosted server
+      return RuntimeConfig().backendUrl; // prod or hosted
     } else {
-      return "http://10.0.2.2:4000"; // Local dev/emulator
+      return RuntimeConfig().backendUrl; // dev or ngrok
     }
   }
 }

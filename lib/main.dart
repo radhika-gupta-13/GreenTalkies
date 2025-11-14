@@ -7,6 +7,7 @@ import 'home_content/home.dart';
 import 'home_content/identify_diagnose.dart';
 import 'package:greentalkies/bud & basket/providers/cart_provider.dart';
 import 'package:greentalkies/bud & basket/providers/wishlist_provider.dart';
+import 'bud & basket/providers/buy_now_provider.dart';
 import 'colors.dart'; // GTColors
 
 void main() {
@@ -23,6 +24,7 @@ class GreenTalkiesApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => WishlistProvider()),
+        ChangeNotifierProvider(create: (_) => BuyNowProvider()), 
       ],
       child: MaterialApp(
         title: 'GreenTalkies',

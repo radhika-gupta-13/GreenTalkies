@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:greentalkies/colors.dart';
 import 'package:greentalkies/models/product_model.dart';
-import 'package:http/http.dart' as http;
+import 'buy_now.dart';
 import 'dart:convert';
-import 'package:network_info_plus/network_info_plus.dart';
-import 'package:provider/provider.dart';
-import '../providers/cart_provider.dart';
-import '../providers/wishlist_provider.dart';
+import 'package:http/http.dart' as http;
+import '/backend_config.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
@@ -25,95 +23,123 @@ class ProductDetailPage extends StatefulWidget {
 class _ProductDetailPageState extends State<ProductDetailPage> {
   int quantity = 1;
   bool isWishlist = false;
-  List<Map<String, dynamic>> reviews = [];
-  String baseUrl = "http://"; // will be updated dynamically
+  bool isInCart = false;
+  String serverUrl = "";
 
   @override
   void initState() {
     super.initState();
-    initBaseUrl();
-    fetchReviews();
-    final wishlist = Provider.of<WishlistProvider>(context, listen: false);
-    isWishlist = wishlist.isInWishlist(widget.product.id);
+    _initServerUrl();
   }
 
-  Future<void> initBaseUrl() async {
-    final info = NetworkInfo();
-    final ip = await info.getWifiIP(); // fetch local IP dynamically
+  Future<void> _initServerUrl() async {
+    final ip = await BackendConfig.getServerIp();
+    if (!mounted) return;
     setState(() {
-      baseUrl = "http://${ip ?? "127.0.0.1"}:5000";
+      serverUrl = BackendConfig.apiBase(ip);
     });
+    _checkInitialStatus();
   }
 
-  Future<void> fetchReviews() async {
-    if (baseUrl.isEmpty) return;
+  Future<void> _checkInitialStatus() async {
+    if (serverUrl.isEmpty) return;
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/products/${widget.product.id}/reviews'));
-      if (response.statusCode == 200) {
+      // Check cart status
+      final cartResp = await http.get(Uri.parse('$serverUrl/cart/list/${widget.userId}'));
+      if (cartResp.statusCode == 200) {
+        final cartData = jsonDecode(cartResp.body) as List;
+        if (!mounted) return;
         setState(() {
-          reviews = List<Map<String, dynamic>>.from(jsonDecode(response.body));
+          isInCart = cartData.any((item) => item['product']['_id'] == widget.product.id);
+        });
+      }
+
+      // Check wishlist status
+      final wishlistResp = await http.get(Uri.parse('$serverUrl/wishlist/list/${widget.userId}'));
+      if (wishlistResp.statusCode == 200) {
+        final wishlistData = jsonDecode(wishlistResp.body) as List;
+        if (!mounted) return;
+        setState(() {
+          isWishlist = wishlistData.any((item) => item['product']['_id'] == widget.product.id);
         });
       }
     } catch (e) {
-      // handle error silently
+      print("Initial status error: $e");
     }
   }
 
   Future<void> addToCart() async {
-    final url = Uri.parse("$baseUrl/cart/add");
+    if (serverUrl.isEmpty) return;
     try {
       final response = await http.post(
-        url,
+        Uri.parse('$serverUrl/cart/add'),
         headers: {'Content-Type': 'application/json'},
-        body:
-            jsonEncode({'productId': widget.product.id, 'quantity': quantity}),
+        body: jsonEncode({
+          'userId': widget.userId,
+          'productId': widget.product.id,
+          'quantity': quantity,
+        }),
       );
+
+      if (!mounted) return;
       if (response.statusCode == 200) {
-        Provider.of<CartProvider>(context, listen: false)
-            .addProduct(widget.product, quantity);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Added to cart!')),
-        );
+        setState(() => isInCart = true);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Added to cart')));
       } else {
-        throw Exception('Failed');
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to add to cart: ${response.body}')));
       }
-    } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to add to cart.')),
-      );
+    } catch (e) {
+      print("Add to cart error: $e");
     }
   }
 
-  Future<void> buyNow() async {
-    final url = Uri.parse("$baseUrl/order/create");
+  Future<void> toggleWishlist() async {
+    if (serverUrl.isEmpty) return;
     try {
       final response = await http.post(
-        url,
+        Uri.parse('$serverUrl/wishlist/toggle'),
         headers: {'Content-Type': 'application/json'},
-        body:
-            jsonEncode({'productId': widget.product.id, 'quantity': quantity}),
+        body: jsonEncode({
+          'userId': widget.userId,
+          'productId': widget.product.id,
+        }),
       );
+
+      if (!mounted) return;
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Order placed successfully!')),
-        );
+        setState(() => isWishlist = !isWishlist);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(isWishlist ? 'Added to wishlist' : 'Removed from wishlist'),
+        ));
       } else {
-        throw Exception('Failed');
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Wishlist update failed: ${response.body}')));
       }
-    } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to place order.')),
-      );
+    } catch (e) {
+      print("Wishlist error: $e");
     }
   }
 
-  void toggleWishlist() {
-    final wishlist = Provider.of<WishlistProvider>(context, listen: false);
-    wishlist.toggleProduct(widget.product);
-    setState(() {
-      isWishlist = wishlist.isInWishlist(widget.product.id);
-    });
+  void buyNow() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BuyNowScreen(
+          userId: widget.userId,
+          products: [
+            {
+              "productId": widget.product.id,
+              "name": widget.product.name,
+              "price": widget.product.price,
+              "quantity": quantity,
+              "image": widget.product.imageUrl,
+            }
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -125,8 +151,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         title: Text(widget.product.name, style: const TextStyle(fontSize: 18)),
         actions: [
           IconButton(
-            icon: Icon(isWishlist ? Icons.favorite : Icons.favorite_border,
-                color: Colors.red),
+            icon: Icon(
+              isWishlist ? Icons.favorite : Icons.favorite_border,
+              color: Colors.red,
+            ),
             onPressed: toggleWishlist,
           ),
         ],
@@ -138,12 +166,20 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(15),
-              child: Image.asset(
-                widget.product.imageUrl,
-                width: double.infinity,
-                height: 250,
-                fit: BoxFit.cover,
-              ),
+              child: widget.product.imageUrl.isNotEmpty
+                  ? Image.asset(
+                      widget.product.imageUrl,
+                      width: double.infinity,
+                      height: 250,
+                      fit: BoxFit.cover,
+                    )
+                  : Container(
+                      width: double.infinity,
+                      height: 250,
+                      color: GTColors.lushGreen.withOpacity(0.1),
+                      child: const Icon(Icons.local_florist,
+                          color: GTColors.lushGreen, size: 60),
+                    ),
             ),
             const SizedBox(height: 15),
             Text(widget.product.name,
@@ -174,46 +210,20 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       IconButton(
                           icon: const Icon(Icons.remove),
                           onPressed: () {
-                            if (quantity > 1) {
-                              setState(() {
-                                quantity--;
-                              });
-                            }
+                            if (quantity > 1) setState(() => quantity--);
                           }),
                       Text(quantity.toString(),
                           style: const TextStyle(fontSize: 16)),
                       IconButton(
                           icon: const Icon(Icons.add),
                           onPressed: () {
-                            setState(() {
-                              quantity++;
-                            });
+                            setState(() => quantity++);
                           }),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 25),
-            const Text('Reviews',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            reviews.isEmpty
-                ? const Text('No reviews yet.')
-                : ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: reviews.length,
-                    itemBuilder: (context, index) {
-                      final review = reviews[index];
-                      return ListTile(
-                        leading: const CircleAvatar(child: Icon(Icons.person)),
-                        title: Text(review['user']),
-                        subtitle: Text(review['comment']),
-                        trailing: Icon(Icons.star, color: Colors.amber),
-                      );
-                    },
-                  ),
           ],
         ),
       ),

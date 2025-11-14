@@ -1,14 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:greentalkies/colors.dart';
 import 'package:http/http.dart' as http;
-import 'package:network_info_plus/network_info_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../authentication/login.dart';
+import '/backend_config.dart'; 
 
 // ----------------------------
 // User Model
@@ -52,7 +51,6 @@ class _ProfilePageState extends State<ProfilePage> {
   bool isLoading = false;
   bool fetchError = false;
   String? baseUrl;
-  Timer? _ipPollTimer;
   File? _newImage;
 
   final _nameController = TextEditingController();
@@ -68,7 +66,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   void dispose() {
-    _ipPollTimer?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -76,44 +73,31 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // ----------------------------
-  // Setup base URL & fetch user
+  // Setup backend URL & fetch user
   // ----------------------------
   Future<void> _setupBaseUrlAndFetchUser() async {
-    final info = NetworkInfo();
-    String? wifiIP = await info.getWifiIP();
+    try {
+      final ip = await BackendConfig.getServerIp();
+      baseUrl = BackendConfig.apiBase(ip);
 
-    if (kIsWeb) {
-      baseUrl = "http://localhost:4000";
-    } else if (wifiIP != null) {
-      baseUrl = "http://$wifiIP:4000";
-    } else {
-      baseUrl = "http://10.0.2.2:4000"; // Android emulator fallback
-    }
-
-    // Load persisted photo first
-    final prefs = await SharedPreferences.getInstance();
-    String? savedPhoto = prefs.getString('profilePhoto_${widget.userId}');
-    if (savedPhoto != null && mounted) {
-      setState(() {
-        user = User(uid: widget.userId, displayName: '', email: '', photoUrl: savedPhoto);
-      });
-    }
-
-    await _fetchUser();
-
-    // Poll for IP changes every 10s
-    _ipPollTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
-      String? newIP = await info.getWifiIP();
-      String newBase = newIP != null ? "http://$newIP:4000" : baseUrl!;
-      if (newBase != baseUrl && mounted) {
-        setState(() => baseUrl = newBase);
-        await _fetchUser();
+      // Load locally saved photo first
+      final prefs = await SharedPreferences.getInstance();
+      String? savedPhoto = prefs.getString('profilePhoto_${widget.userId}');
+      if (savedPhoto != null && mounted) {
+        setState(() {
+          user = User(uid: widget.userId, displayName: '', email: '', photoUrl: savedPhoto);
+        });
       }
-    });
+
+      await _fetchUser();
+    } catch (e) {
+      setState(() => fetchError = true);
+      print("❌ Error initializing profile page: $e");
+    }
   }
 
   // ----------------------------
-  // Fetch user data from backend
+  // Fetch user data
   // ----------------------------
   Future<void> _fetchUser() async {
     if (baseUrl == null || widget.userId.isEmpty) {
@@ -157,26 +141,17 @@ class _ProfilePageState extends State<ProfilePage> {
   // Save profile changes
   // ----------------------------
   Future<void> _saveSettings() async {
-    if (!_formKey.currentState!.validate() || user == null || baseUrl == null)
-      return;
+    if (!_formKey.currentState!.validate() || user == null || baseUrl == null) return;
 
     setState(() => isLoading = true);
 
     Map<String, dynamic> updatedData = {};
-    if (_nameController.text.trim() != user!.displayName) {
-      updatedData['displayName'] = _nameController.text.trim();
-    }
-    if (_emailController.text.trim() != user!.email) {
-      updatedData['email'] = _emailController.text.trim();
-    }
-    if (_passwordController.text.isNotEmpty) {
-      updatedData['password'] = _passwordController.text.trim();
-    }
+    if (_nameController.text.trim() != user!.displayName) updatedData['displayName'] = _nameController.text.trim();
+    if (_emailController.text.trim() != user!.email) updatedData['email'] = _emailController.text.trim();
+    if (_passwordController.text.isNotEmpty) updatedData['password'] = _passwordController.text.trim();
 
     if (updatedData.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No changes were made.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No changes were made.')));
       setState(() => isLoading = false);
       return;
     }
@@ -195,18 +170,14 @@ class _ProfilePageState extends State<ProfilePage> {
           user!.email = data['email'] ?? user!.email;
         });
         _passwordController.clear();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully!')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated successfully!')));
       } else {
         final data = jsonDecode(response.body);
         final message = data['message'] ?? 'Failed to update profile';
         throw Exception(message);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating profile: $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error updating profile: $e')));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -226,10 +197,7 @@ class _ProfilePageState extends State<ProfilePage> {
     _newImage = File(pickedFile.path);
 
     try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$baseUrl/user/${user!.uid}/photo'),
-      );
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/user/${user!.uid}/photo'));
       request.files.add(await http.MultipartFile.fromPath('photo', _newImage!.path));
 
       final streamedResponse = await request.send();
@@ -244,7 +212,6 @@ class _ProfilePageState extends State<ProfilePage> {
               : '?v=${DateTime.now().millisecondsSinceEpoch}';
         }
 
-        // Persist locally
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('profilePhoto_${user!.uid}', newPhotoUrl!);
 
@@ -253,18 +220,12 @@ class _ProfilePageState extends State<ProfilePage> {
           _newImage = null;
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile photo updated!')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile photo updated!')));
       } else {
         throw Exception(data['message'] ?? 'Failed to upload photo');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading photo: $e')),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error uploading photo: $e')));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -295,17 +256,10 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       await http.post(Uri.parse('$baseUrl/auth/logout'));
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => LoginPage()),
-          (route) => false,
-        );
+        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => LoginPage()), (route) => false);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error logging out: $e')));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error logging out: $e')));
     }
   }
 
@@ -339,8 +293,7 @@ class _ProfilePageState extends State<ProfilePage> {
     } else if (user!.photoUrl != null && user!.photoUrl!.isNotEmpty) {
       avatarImage = NetworkImage(user!.photoUrl!);
     } else {
-      // No default asset at all
-      avatarImage = const AssetImage(''); // empty placeholder
+      avatarImage = const AssetImage('assets/default_avatar.png'); // fallback default
     }
 
     return Scaffold(

@@ -6,10 +6,9 @@ import 'dart:io';
 const String _systemInstruction =
     "You are Greenie, an AI assistant for the GreenTalkies community. Your goal is to provide concise, friendly, and helpful advice on sustainability, gardening, recycling, and eco-friendly living. Always encourage users to check the community for real-life advice and local events. Keep responses short and actionable.";
 const String _modelName = 'gemini-2.5-flash-preview-09-2025';
-const String _apiKey = '';
-const String _apiUrlBase = 'https://generativelanguage.googleapis.com/v1beta/models/';
+const String _apiKey = 'AIzaSyCXQAEksR36Vtqz2km0lSchxh2tumtGebk';
+const String _apiUrlBase = 'http://192.168.0.103:4000/api';
 
-// Simple Fetch shim using package:http to provide .ok, .status and json() like the browser fetch.
 class _FetchResponse {
   final int status;
   final String _body;
@@ -91,10 +90,10 @@ class GreenTalkiesApp extends StatelessWidget {
           backgroundColor: const Color.fromARGB(255, 60, 162, 65),
           foregroundColor: Colors.white,
         ),
-        colorScheme: ColorScheme.fromSwatch(primarySwatch: primaryGreen)
-            .copyWith(
-              secondary: Colors.lightGreen.shade400, // Accent color
-            ),
+        colorScheme:
+            ColorScheme.fromSwatch(primarySwatch: primaryGreen).copyWith(
+          secondary: Colors.lightGreen.shade400, // Accent color
+        ),
         useMaterial3: true,
       ),
       // Set home directly to the Chatbot page
@@ -158,7 +157,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       return;
     }
 
-    final apiUrl = '$_apiUrlBase$_modelName:generateContent?key=$_apiKey';
+    final apiUrl =
+        'https://generativelanguage.googleapis.com/v1beta/models/$_modelName:generateContent?key=$_apiKey';
 
     // Construct the chat history for context
     List<Map<String, dynamic>> chatHistory = [];
@@ -203,8 +203,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       }
 
       final result = await response.json();
-      final text =
-          result['candidates']?[0]?['content']?['parts']?[0]?['text'] ??
+      final text = result['candidates']?[0]?['content']?['parts']?[0]
+              ?['text'] ??
           "Sorry, I couldn't generate a response.";
 
       setState(() {
@@ -365,9 +365,8 @@ class ChatMessage extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 10.0),
       child: Row(
-        mainAxisAlignment: isGreenie
-            ? MainAxisAlignment.start
-            : MainAxisAlignment.end,
+        mainAxisAlignment:
+            isGreenie ? MainAxisAlignment.start : MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Greenie Avatar
@@ -395,12 +394,10 @@ class ChatMessage extends StatelessWidget {
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16.0),
                   topRight: const Radius.circular(16.0),
-                  bottomLeft: isGreenie
-                      ? Radius.zero
-                      : const Radius.circular(16.0),
-                  bottomRight: isGreenie
-                      ? const Radius.circular(16.0)
-                      : Radius.zero,
+                  bottomLeft:
+                      isGreenie ? Radius.zero : const Radius.circular(16.0),
+                  bottomRight:
+                      isGreenie ? const Radius.circular(16.0) : Radius.zero,
                 ),
                 boxShadow: [
                   BoxShadow(

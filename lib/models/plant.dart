@@ -81,3 +81,64 @@ class Plant {
     }
   }
 }
+
+class PlantTask {
+  final String id;
+  final String key;
+  final String plantName;
+  final String task;
+  final String time;
+  final String status;
+
+  PlantTask({
+    required this.key,
+    required this.plantName,
+    required this.task,
+    required this.time,
+    this.id = '',
+    this.status = 'pending',
+  });
+
+  PlantTask snooze(String newTime) {
+    return PlantTask(
+      id: id,
+      key: key,
+      plantName: plantName,
+      task: task,
+      time: newTime,
+      status: status,
+    );
+  }
+
+  PlantTask copyWith({String? status, String? time}) {
+    return PlantTask(
+      id: id,
+      key: key,
+      plantName: plantName,
+      task: task,
+      time: time ?? this.time,
+      status: status ?? this.status,
+    );
+  }
+
+  factory PlantTask.fromJson(Map<String, dynamic> json) {
+    return PlantTask(
+      id: json['_id'] ?? '',
+      key: json['key'] ?? UniqueKey().toString(),
+      plantName: json['plantName'] ?? 'Unknown Plant',
+      task: json['task'] ?? 'Unnamed Task',
+      time: json['time'] ?? 'Not Scheduled',
+      status: json['status'] ?? 'pending',
+    );
+  }
+
+  Map<String, dynamic> toJson(String userId) => {
+        if (id.isNotEmpty) '_id': id,
+        'key': key,
+        'plantName': plantName,
+        'task': task,
+        'time': time,
+        'status': status,
+        'userId': userId,
+      };
+}

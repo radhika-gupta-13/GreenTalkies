@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:greentalkies/colors.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:network_info_plus/network_info_plus.dart';
 import 'plants_detail.dart';
 import 'add_plant.dart';
 import '../models/plant.dart';
+import '../backend_config.dart';
 
 // =======================================================
 //                MY PLANTS SCREEN
@@ -42,24 +42,15 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
     });
 
     try {
-      // 1️⃣ Get device Wi-Fi IP
-      final info = NetworkInfo();
-      final wifiIP = await info.getWifiIP();
-      if (wifiIP == null) throw Exception("Wi-Fi IP not found");
+      final ip = await BackendConfig.getServerIp();
+      backendUrl = BackendConfig.apiBase(ip);
 
-      backendUrl = 'http://$wifiIP:4000';
-
-      // 2️⃣ Fetch plants from backend
       await _fetchPlants();
     } catch (e) {
       print("❌ Error initializing MyPlantsScreen: $e");
-      setState(() {
-        hasError = true;
-      });
+      setState(() => hasError = true);
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
     }
   }
 
@@ -82,15 +73,11 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
         });
       } else {
         print('❌ Failed with status ${response.statusCode}');
-        setState(() {
-          hasError = true;
-        });
+        setState(() => hasError = true);
       }
     } catch (e) {
       print('❌ Error fetching plants: $e');
-      setState(() {
-        hasError = true;
-      });
+      setState(() => hasError = true);
     }
   }
 
@@ -338,7 +325,7 @@ class PlantListCard extends StatelessWidget {
                 image: DecorationImage(
                   image: imageProvider,
                   fit: BoxFit.cover,
-                  onError: (_, __) {}, // fallback handled
+                  onError: (_, __) {},
                 ),
               ),
             ),

@@ -25,17 +25,6 @@ class PlantTask {
     this.status = 'pending',
   });
 
-  PlantTask snooze(String newTime) {
-    return PlantTask(
-      id: id,
-      key: key,
-      plantName: plantName,
-      task: task,
-      time: newTime,
-      status: status,
-    );
-  }
-
   PlantTask copyWith({String? status, String? time}) {
     return PlantTask(
       id: id,
@@ -85,11 +74,8 @@ class _TaskManagerState extends State<TaskManagerState> {
   bool _isLoading = false;
   String _errorMessage = '';
   String? _backendUrl;
-  final String backendUrl = RuntimeConfig().backendUrl;
-
   final TextEditingController _newTaskController = TextEditingController();
 
-  // 🎨 Task card color palette (cycled)
   final List<Color> _taskColors = [
     Colors.green.shade200,
     Colors.orange.shade200,
@@ -109,11 +95,8 @@ class _TaskManagerState extends State<TaskManagerState> {
     });
   }
 
-  // -----------------------------
-  // Dynamic Backend URL
-  // -----------------------------
   Future<void> _setBackendUrl() async {
-    String baseUrl = '10.0.2.2'; // Android emulator fallback
+    String baseUrl = '10.0.2.2';
     final info = NetworkInfo();
     try {
       if (kIsWeb) {
@@ -133,12 +116,8 @@ class _TaskManagerState extends State<TaskManagerState> {
 
   String _getServerUrl() => _backendUrl ?? 'http://10.0.2.2:4000';
 
-  // -----------------------------
-  // Fetch Tasks from Backend
-  // -----------------------------
   Future<void> _fetchTasks() async {
     if (_backendUrl == null) return;
-
     setState(() {
       _isLoading = true;
       _errorMessage = '';
@@ -168,9 +147,6 @@ class _TaskManagerState extends State<TaskManagerState> {
     }
   }
 
-  // -----------------------------
-  // Add Task
-  // -----------------------------
   Future<void> _addTask(String taskName, String dueTime) async {
     if (_backendUrl == null) return;
 
@@ -178,7 +154,7 @@ class _TaskManagerState extends State<TaskManagerState> {
       key: UniqueKey().toString(),
       plantName: 'Custom Plant',
       task: taskName,
-      time: dueTime, // Use picked date and time
+      time: dueTime,
     );
 
     try {
@@ -199,9 +175,6 @@ class _TaskManagerState extends State<TaskManagerState> {
     }
   }
 
-  // -----------------------------
-  // Delete Task
-  // -----------------------------
   Future<void> _deleteTask(PlantTask task) async {
     if (_backendUrl == null || task.id.isEmpty) return;
 
@@ -210,7 +183,9 @@ class _TaskManagerState extends State<TaskManagerState> {
       final response = await http.delete(url);
 
       if (response.statusCode == 200) {
-        await _fetchTasks();
+        setState(() {
+          _careTasks.remove(task);
+        });
       } else {
         print('❌ Failed to delete task: ${response.body}');
       }
@@ -219,34 +194,77 @@ class _TaskManagerState extends State<TaskManagerState> {
     }
   }
 
-  // -----------------------------
-  // Update Task Status
-  // -----------------------------
   Future<void> _updateTaskStatus(PlantTask task, String status) async {
-    if (_backendUrl == null || task.id.isEmpty) return;
+    if (task.id.isEmpty) return; // only backend tasks
+
+    int index = _careTasks.indexWhere((t) => t.id == task.id);
+    if (index == -1) return;
+
+    setState(() {
+      _careTasks[index] = _careTasks[index].copyWith(status: status);
+    });
 
     try {
-      final url =
-          Uri.parse('${_getServerUrl()}/tasks/${task.id}/status'); // PATCH
+      final url = Uri.parse('${_getServerUrl()}/tasks/${task.id}/status');
       final response = await http.patch(
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'status': status}),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode != 200) {
+        print('❌ Failed to update status: ${response.body}');
         await _fetchTasks();
-      } else {
-        print('❌ Failed to update task: ${response.body}');
       }
     } catch (e) {
-      print('❌ Error updating task: $e');
+      print('❌ Error updating status: $e');
+      await _fetchTasks();
     }
   }
 
-  // -----------------------------
-  // Get Icon
-  // -----------------------------
+  Future<void> _snoozeTask(PlantTask task) async {
+    DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+
+    if (pickedDate == null) return;
+
+    TimeOfDay? pickedTime = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 9, minute: 0),
+    );
+
+    if (pickedTime == null) return;
+
+    String formattedDateTime =
+        "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')} "
+        "${pickedTime.hour.toString().padLeft(2, '0')}:${pickedTime.minute.toString().padLeft(2, '0')}";
+
+    int index = _careTasks.indexWhere((t) => t.id == task.id);
+    if (index != -1) {
+      setState(() {
+        _careTasks[index] = _careTasks[index].copyWith(time: formattedDateTime);
+      });
+
+      if (task.id.isNotEmpty) {
+        try {
+          final url = Uri.parse('${_getServerUrl()}/tasks/${task.id}');
+          await http.patch(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'time': formattedDateTime}),
+          );
+        } catch (e) {
+          print('❌ Error snoozing task: $e');
+          await _fetchTasks();
+        }
+      }
+    }
+  }
+
   IconData _getTaskIcon(String task) {
     final t = task.toLowerCase();
     if (t.contains('water')) return Icons.water_drop_outlined;
@@ -256,9 +274,6 @@ class _TaskManagerState extends State<TaskManagerState> {
     return Icons.task_alt_rounded;
   }
 
-  // -----------------------------
-  // UI
-  // -----------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -268,7 +283,6 @@ class _TaskManagerState extends State<TaskManagerState> {
       ),
       body: Column(
         children: [
-          // Add new task input with date & time picker
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Row(
@@ -287,7 +301,6 @@ class _TaskManagerState extends State<TaskManagerState> {
                   onPressed: () async {
                     if (_newTaskController.text.trim().isEmpty) return;
 
-                    // Show date picker
                     DateTime? pickedDate = await showDatePicker(
                       context: context,
                       initialDate: DateTime.now().add(const Duration(days: 1)),
@@ -295,24 +308,21 @@ class _TaskManagerState extends State<TaskManagerState> {
                       lastDate: DateTime.now().add(const Duration(days: 365)),
                     );
 
-                    if (pickedDate != null) {
-                      // Show time picker
-                      TimeOfDay? pickedTime = await showTimePicker(
-                        context: context,
-                        initialTime: const TimeOfDay(hour: 9, minute: 0),
-                      );
+                    if (pickedDate == null) return;
 
-                      if (pickedTime != null) {
-                        // Format date and time
-                        String formattedDateTime =
-                            "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')} "
-                            "${pickedTime.hour.toString().padLeft(2, '0')}:${pickedTime.minute.toString().padLeft(2, '0')}";
+                    TimeOfDay? pickedTime = await showTimePicker(
+                      context: context,
+                      initialTime: const TimeOfDay(hour: 9, minute: 0),
+                    );
 
-                        // Add task with selected date & time
-                        _addTask(_newTaskController.text.trim(), formattedDateTime);
-                        _newTaskController.clear();
-                      }
-                    }
+                    if (pickedTime == null) return;
+
+                    String formattedDateTime =
+                        "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')} "
+                        "${pickedTime.hour.toString().padLeft(2, '0')}:${pickedTime.minute.toString().padLeft(2, '0')}";
+
+                    _addTask(_newTaskController.text.trim(), formattedDateTime);
+                    _newTaskController.clear();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade600,
@@ -322,8 +332,6 @@ class _TaskManagerState extends State<TaskManagerState> {
               ],
             ),
           ),
-
-          // Task list
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -373,6 +381,11 @@ class _TaskManagerState extends State<TaskManagerState> {
                                             color: Colors.green),
                                         onPressed: () =>
                                             _updateTaskStatus(task, 'done'),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.snooze,
+                                            color: Colors.orange),
+                                        onPressed: () => _snoozeTask(task),
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.delete,

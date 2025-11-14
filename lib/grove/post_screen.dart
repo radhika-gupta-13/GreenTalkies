@@ -25,7 +25,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
   final TextEditingController topicController = TextEditingController();
   final TextEditingController contentController = TextEditingController();
   File? selectedImage;
-  String? uploadedImageUrl;
   String? baseUrl;
   final List<int> portsToTry = [3000, 4000];
 
@@ -61,9 +60,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
   }
 
   Future<void> pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-    );
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
         selectedImage = File(pickedFile.path);
@@ -74,7 +71,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
   void removeImage() {
     setState(() {
       selectedImage = null;
-      uploadedImageUrl = null;
     });
   }
 
@@ -88,7 +84,12 @@ class _NewPostScreenState extends State<NewPostScreen> {
 
     final topic = topicController.text.trim();
     final content = contentController.text.trim();
-    if (topic.isEmpty || content.isEmpty) return;
+    if (topic.isEmpty || content.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Topic and content cannot be empty')),
+      );
+      return;
+    }
 
     try {
       http.MultipartRequest request = http.MultipartRequest(
@@ -102,9 +103,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
       request.fields['content'] = content;
 
       if (selectedImage != null) {
-        request.files.add(
-          await http.MultipartFile.fromPath('image', selectedImage!.path),
-        );
+        request.files.add(await http.MultipartFile.fromPath('image', selectedImage!.path));
       }
 
       final response = await request.send();
@@ -113,7 +112,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
       if (response.statusCode == 201) {
         final Map<String, dynamic> responseData = jsonDecode(respStr);
         final newPost = GrovePostModel.fromJson(responseData);
-
         Navigator.pop(context, newPost); // Return the new post to previous screen
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -142,9 +140,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
           : SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + keyboardSpace),
               child: Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 elevation: 6,
                 shadowColor: Colors.black26,
                 child: Padding(
@@ -185,11 +181,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
                                     shape: BoxShape.circle,
                                   ),
                                   padding: const EdgeInsets.all(6),
-                                  child: const Icon(
-                                    Icons.close,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
+                                  child: const Icon(Icons.close, color: Colors.white, size: 20),
                                 ),
                               ),
                             ),
@@ -210,17 +202,13 @@ class _NewPostScreenState extends State<NewPostScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  selectedImage == null
-                                      ? Icons.add_a_photo
-                                      : Icons.edit,
+                                  selectedImage == null ? Icons.add_a_photo : Icons.edit,
                                   size: 40,
                                   color: Colors.grey,
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  selectedImage == null
-                                      ? 'Add an image'
-                                      : 'Change image',
+                                  selectedImage == null ? 'Add an image' : 'Change image',
                                   style: const TextStyle(color: Colors.grey),
                                 ),
                               ],

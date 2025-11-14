@@ -14,9 +14,7 @@ import 'care_card.dart'; // CareReminderCard
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:greentalkies/config.dart';
-import 'package:flutter/foundation.dart'; // kIsWeb
-import 'package:network_info_plus/network_info_plus.dart';
+import 'package:greentalkies/backend_config.dart'; // BackendConfig
 
 // Logged-in user ID
 String? loggedInUserId;
@@ -33,7 +31,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<PlantTask> _careTasks = [];
   bool _isLoading = false;
   String _errorMessage = '';
-  String? _backendIp;
   String _userName = '';
   String? _userId;
 
@@ -48,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
     colors.GTColors.radiantGreen,
     colors.GTColors.sunshineYellow,
     colors.GTColors.mintGreen,
+    colors.GTColors.blueGreen,
   ];
 
   @override
@@ -57,27 +55,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _initApp() async {
-    await _setBackendIp();
     await _loadUserId();
 
     if (_userId != null) {
       await _fetchTasks();
       await _fetchImpactMetrics();
     }
-  }
-
-  Future<void> _setBackendIp() async {
-    if (kIsWeb) {
-      _backendIp = 'http://localhost:4000';
-    } else {
-      final info = NetworkInfo();
-      String? wifiIp = await info.getWifiIP();
-      _backendIp = wifiIp != null
-          ? 'http://$wifiIp:4000'
-          : 'http://10.0.2.2:4000';
-    }
-    print("✅ Backend IP: $_backendIp");
-    setState(() {});
   }
 
   Future<void> _loadUserId() async {
@@ -91,9 +74,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchUserName(String userId) async {
     try {
-      if (_backendIp == null) return;
-      final url = Uri.parse('$_backendIp/user/$userId');
+      final ip = await BackendConfig.getServerIp();
+      final url = Uri.parse('${BackendConfig.apiBase(ip)}/user/$userId');
       final response = await http.get(url).timeout(const Duration(seconds: 5));
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
@@ -116,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Task Management
   // -----------------------------
   Future<void> _fetchTasks() async {
-    if (_backendIp == null || _userId == null) return;
+    if (_userId == null) return;
 
     setState(() {
       _isLoading = true;
@@ -124,7 +108,8 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      final url = Uri.parse('$_backendIp/tasks/$_userId');
+      final ip = await BackendConfig.getServerIp();
+      final url = Uri.parse('${BackendConfig.apiBase(ip)}/tasks/$_userId');
       final response = await http.get(url).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
@@ -152,10 +137,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchImpactMetrics() async {
-    if (_backendIp == null || _userId == null) return;
+    if (_userId == null) return;
 
     try {
-      final url = Uri.parse('$_backendIp/user/$_userId/impact');
+      final ip = await BackendConfig.getServerIp();
+      final url = Uri.parse('${BackendConfig.apiBase(ip)}/user/$_userId/impact');
       final response = await http.get(url).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
@@ -183,14 +169,16 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _openScheduleTaskPage() {
-    if (_backendIp == null || _userId == null) return;
+  void _openScheduleTaskPage() async {
+    if (_userId == null) return;
+
+    final ip = await BackendConfig.getServerIp();
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) =>
-            ScheduleTaskAutoOpenPage(backendUrl: _backendIp!, userId: _userId!),
+            ScheduleTaskAutoOpenPage( userId: _userId!),
       ),
     ).then((_) async {
       await _fetchTasks();
@@ -219,7 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
           await _fetchImpactMetrics();
         },
         userId: _userId!,
-        backendUrl: _backendIp ?? '',
+        backendUrl: '', // not needed, HomeContent doesn't call backend directly
         taskCardColors: _taskCardColors,
         plantsPlanted: _plantsPlanted,
         co2Absorbed: _co2Absorbed,
@@ -423,8 +411,7 @@ class _HomeContent extends StatelessWidget {
                     return CareReminderCard(
                       taskData: task,
                       cardColor: color,
-                      onCompleted: (t) => onTaskCompleted(t),
-                      onSnoozed: (t) => onTaskSnoozed(t),
+                      userId: userId,
                     );
                   }).toList(),
                 ),

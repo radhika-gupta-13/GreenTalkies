@@ -4,7 +4,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'models.dart'; // Import PlantTask and GTColors
+import '/backend_config.dart';
+import 'models.dart'; 
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -37,7 +38,7 @@ Future<void> scheduleNotification(String taskName, DateTime scheduledTime) async
 
   try {
     await flutterLocalNotificationsPlugin.zonedSchedule(
-      scheduledTime.millisecondsSinceEpoch, // unique id
+      scheduledTime.millisecondsSinceEpoch,
       'Plant Task Reminder',
       taskName,
       tzScheduled,
@@ -53,13 +54,11 @@ Future<void> scheduleNotification(String taskName, DateTime scheduledTime) async
 
 class ScheduleTaskForm extends StatefulWidget {
   final void Function(PlantTask) onTaskAdded;
-  final String backendUrl;
   final String? userId;
 
   const ScheduleTaskForm({
     super.key,
     required this.onTaskAdded,
-    required this.backendUrl,
     this.userId,
   });
 
@@ -73,11 +72,21 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
   DateTime? _taskDateTime;
   bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
+  String? _backendUrl;
 
   @override
   void initState() {
     super.initState();
     initializeNotifications();
+    _initBackend();
+  }
+
+  Future<void> _initBackend() async {
+    final ip = await BackendConfig.getServerIp();
+    setState(() {
+      _backendUrl = BackendConfig.apiBase(ip);
+    });
+    print("🌿 Using backend: $_backendUrl");
   }
 
   Future<void> _pickDateTime() async {
@@ -125,54 +134,54 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
         "${_taskDateTime!.hour.toString().padLeft(2, '0')}:${_taskDateTime!.minute.toString().padLeft(2, '0')}";
 
     final newTask = PlantTask(
-      key: UniqueKey().toString(),
-      id: '',
+      id: UniqueKey().toString(),
+      userId: '',
       plantName: _plantName,
       task: _taskName,
       time: formattedTime,
     );
 
-    print("Saving task: $_taskName for plant: $_plantName at $_taskDateTime");
+    print("🌱 Saving task: $_taskName for plant: $_plantName at $_taskDateTime");
 
-    // FRONTEND SAVE
+    // Add task locally
     widget.onTaskAdded(newTask);
 
-    // Schedule Notification (non-blocking)
+    // Schedule local notification
     try {
       await scheduleNotification(_taskName, _taskDateTime!);
-      print("Notification scheduled for $_taskName at $_taskDateTime");
+      print("✅ Notification scheduled for $_taskName at $_taskDateTime");
     } catch (e) {
-      print("Notification error: $e");
+      print("⚠️ Notification error: $e");
     }
 
-    // BACKEND SAVE
+    // Save to backend
     bool backendSuccess = true;
     String message = 'Task saved successfully.';
 
-    if (widget.backendUrl.isNotEmpty && widget.userId != null) {
+    if (_backendUrl != null && widget.userId != null) {
       try {
-        final response = await http
-            .post(
-              Uri.parse('${widget.backendUrl}/tasks'),
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({
-                'userId': widget.userId,
-                'plantName': _plantName,
-                'task': _taskName,
-                'time': formattedTime,
-              }),
-            )
-            .timeout(const Duration(seconds: 10));
+        final response = await http.post(
+          Uri.parse('$_backendUrl/tasks'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'userId': widget.userId,
+            'plantName': _plantName,
+            'task': _taskName,
+            'time': formattedTime,
+          }),
+        );
 
         if (response.statusCode < 200 || response.statusCode >= 300) {
           backendSuccess = false;
-          message = 'Task saved locally, but failed to sync to server.';
-          print('Backend post failed: ${response.statusCode}');
+          message = 'Task saved locally, but failed to sync with server.';
+          print('❌ Server returned ${response.statusCode}: ${response.body}');
+        } else {
+          print('✅ Server synced successfully');
         }
       } catch (e) {
         backendSuccess = false;
         message = 'Task saved locally, but failed to connect to server.';
-        print('Backend error: $e');
+        print('🌐 Backend error: $e');
       }
     }
 
@@ -201,9 +210,10 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
             const Text(
               'Schedule Plant Care Task',
               style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: GTColors.forestGreen),
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: GTColors.forestGreen,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 30),
@@ -211,8 +221,9 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
               decoration: InputDecoration(
                 labelText: 'Enter Plant Name',
                 hintText: 'e.g. Monstera Deliciosa',
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               onSaved: (value) => _plantName = value ?? '',
               validator: (value) =>
@@ -223,8 +234,9 @@ class _ScheduleTaskFormState extends State<ScheduleTaskForm> {
               decoration: InputDecoration(
                 labelText: 'Task Name',
                 hintText: 'e.g. Water, Fertilize, Rotate',
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               onSaved: (value) => _taskName = value ?? '',
               validator: (value) =>

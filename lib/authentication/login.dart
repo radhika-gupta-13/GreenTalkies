@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter/foundation.dart'; // kIsWeb
-import 'package:network_info_plus/network_info_plus.dart'; // for local IP
 import 'package:shared_preferences/shared_preferences.dart';
 import '../home_content/home.dart';
 import 'sign_up.dart';
 import '../config.dart';
+import 'forgot_password.dart';
+import '../backend_helper.dart'; // new helper
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -18,38 +18,10 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final String backendUrl = RuntimeConfig().backendUrl;
-
 
   bool _isLoading = false;
   bool _obscurePassword = true;
   String _errorMessage = '';
-  String? _backendUrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _detectBackendUrl();
-  }
-
-  Future<void> _detectBackendUrl() async {
-    final info = NetworkInfo();
-    String baseUrl = '10.0.2.2'; // Android emulator fallback
-
-    try {
-      if (kIsWeb) {
-        baseUrl = 'localhost';
-      } else {
-        final wifiIp = await info.getWifiIP();
-        if (wifiIp != null) baseUrl = wifiIp;
-      }
-    } catch (e) {
-      print("❌ Error detecting Wi-Fi IP: $e");
-    }
-
-    _backendUrl = 'http://$baseUrl:4000';
-    print("✅ Backend URL: $_backendUrl");
-  }
 
   Future<void> _login() async {
     setState(() {
@@ -58,9 +30,10 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      if (_backendUrl == null) await _detectBackendUrl();
-
-      final url = Uri.parse('${_backendUrl!}/auth/login');
+      // Get backend URL dynamically
+      final backendUrl = await BackendHelper().getBackendUrl();
+      final url = Uri.parse('$backendUrl/auth/login');
+      print("🔗 Sending login request to: $url");
 
       final response = await http.post(
         url,
@@ -138,7 +111,8 @@ class _LoginPageState extends State<LoginPage> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.only(bottomRight: Radius.circular(60)),
+                borderRadius:
+                    BorderRadius.only(bottomRight: Radius.circular(60)),
               ),
               child: const Padding(
                 padding: EdgeInsets.only(left: 30, top: 80),
@@ -222,7 +196,6 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-
                     if (_errorMessage.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
@@ -231,8 +204,26 @@ class _LoginPageState extends State<LoginPage> {
                           style: const TextStyle(color: Colors.red),
                         ),
                       ),
-
                     const SizedBox(height: 10),
+                    // TextButton(
+                    //   onPressed: () {
+                    //     Navigator.push(
+                    //       context,
+                    //       MaterialPageRoute(
+                    //           builder: (_) => const ForgotPasswordPage()),
+                    //     );
+                    //   },
+                    //   child: const Align(
+                    //     alignment: Alignment.centerRight,
+                    //     child: Text(
+                    //       "Forgot Password?",
+                    //       style: TextStyle(
+                    //         color: Color(0xFF4C8C45),
+                    //         fontWeight: FontWeight.w600,
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -262,7 +253,6 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                       ),
                     ),
-
                     const SizedBox(height: 15),
                     TextButton(
                       onPressed: () {
@@ -279,7 +269,6 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                     ),
-
                     TextButton(
                       onPressed: _continueAsGuest,
                       child: const Text(

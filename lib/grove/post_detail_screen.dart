@@ -40,10 +40,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       duration: const Duration(milliseconds: 300),
     );
     _likeScaleAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
-      CurvedAnimation(
-        parent: _likeAnimationController,
-        curve: Curves.easeInOut,
-      ),
+      CurvedAnimation(parent: _likeAnimationController, curve: Curves.easeInOut),
     );
   }
 
@@ -68,13 +65,11 @@ class _PostDetailScreenState extends State<PostDetailScreen>
         child: Image.network(
           url,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              height: 180,
-              color: Colors.grey[200],
-              child: const Icon(Icons.broken_image, size: 50, color: Colors.grey),
-            );
-          },
+          errorBuilder: (context, error, stackTrace) => Container(
+            height: 180,
+            color: Colors.grey[200],
+            child: const Icon(Icons.broken_image, size: 50, color: Colors.grey),
+          ),
         ),
       );
     } else {
@@ -83,13 +78,11 @@ class _PostDetailScreenState extends State<PostDetailScreen>
         child: Image.asset(
           url,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              height: 180,
-              color: Colors.grey[200],
-              child: const Icon(Icons.broken_image, size: 50, color: Colors.grey),
-            );
-          },
+          errorBuilder: (context, error, stackTrace) => Container(
+            height: 180,
+            color: Colors.grey[200],
+            child: const Icon(Icons.broken_image, size: 50, color: Colors.grey),
+          ),
         ),
       );
     }
@@ -108,8 +101,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
         backgroundColor: GTColors.lushGreen,
         title: Text(post.username),
         actions: [
-          if (widget.onDeletePost != null &&
-              post.userId == widget.currentUserId)
+          if (widget.onDeletePost != null && post.userId == widget.currentUserId)
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
               onPressed: () {
@@ -124,30 +116,19 @@ class _PostDetailScreenState extends State<PostDetailScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              post.content,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
+            Text(post.content,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
             if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
               const SizedBox(height: 10),
               _buildPostImage(post.imageUrl),
             ],
             const SizedBox(height: 10),
-            Text(
-              '#${post.topic}',
-              style: const TextStyle(
-                color: GTColors.radiantGreen,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text('#${post.topic}',
+                style: const TextStyle(
+                    color: GTColors.radiantGreen, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            Text(
-              formattedDate,
-              style: TextStyle(
-                color: GTColors.darkText.withOpacity(0.6),
-                fontSize: 12,
-              ),
-            ),
+            Text(formattedDate,
+                style: TextStyle(color: GTColors.darkText.withOpacity(0.6), fontSize: 12)),
             const Divider(height: 30),
             Row(
               children: [
@@ -169,14 +150,9 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                 const SizedBox(width: 20),
                 IconButton(
                   onPressed: () {
-                    setState(() {
-                      showCommentField = !showCommentField;
-                    });
+                    setState(() => showCommentField = !showCommentField);
                   },
-                  icon: const Icon(
-                    Icons.comment_outlined,
-                    color: GTColors.lushGreen,
-                  ),
+                  icon: const Icon(Icons.comment_outlined, color: GTColors.lushGreen),
                 ),
                 Text('${post.comments.length}'),
               ],
@@ -199,9 +175,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                       if (text.isNotEmpty) {
                         widget.onComment(post, text);
                         commentController.clear();
-                        setState(() {
-                          showCommentField = false;
-                        });
+                        setState(() => showCommentField = false);
                       }
                     },
                     icon: const Icon(Icons.send, color: GTColors.lushGreen),
@@ -215,10 +189,8 @@ class _PostDetailScreenState extends State<PostDetailScreen>
               child: post.comments.isEmpty
                   ? const Center(
                       key: ValueKey('no_comments'),
-                      child: Text(
-                        'Be the first to comment 🌱',
-                        style: TextStyle(color: Colors.grey),
-                      ),
+                      child: Text('Be the first to comment 🌱',
+                          style: TextStyle(color: Colors.grey)),
                     )
                   : Column(
                       key: const ValueKey('comments_list'),
@@ -228,29 +200,17 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                               padding: const EdgeInsets.only(bottom: 8.0),
                               child: ListTile(
                                 leading: CircleAvatar(
-                                  backgroundColor:
-                                      GTColors.primaryBaseDark.withOpacity(0.2),
-                                  child: const Icon(
-                                    Icons.person,
-                                    color: GTColors.primaryBaseDark,
-                                  ),
+                                  backgroundColor: GTColors.primaryBaseDark.withOpacity(0.2),
+                                  child: const Icon(Icons.person, color: GTColors.primaryBaseDark),
                                 ),
-                                title: Text(
-                                  c.username,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                                title: Text(c.username,
+                                    style: const TextStyle(fontWeight: FontWeight.bold)),
                                 subtitle: Text(c.text),
                                 trailing: (c.userId == widget.currentUserId &&
                                         widget.onDeleteComment != null)
                                     ? IconButton(
-                                        icon: const Icon(
-                                          Icons.delete,
-                                          color: Colors.red,
-                                        ),
-                                        onPressed: () =>
-                                            widget.onDeleteComment!(post, c),
+                                        icon: const Icon(Icons.delete, color: Colors.red),
+                                        onPressed: () => widget.onDeleteComment!(post, c),
                                       )
                                     : null,
                               ),

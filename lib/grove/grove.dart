@@ -1,14 +1,14 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:greentalkies/colors.dart';
 import 'package:greentalkies/models/grove_model.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
-import 'package:network_info_plus/network_info_plus.dart';
 import 'post_detail_screen.dart';
 import 'post_screen.dart';
-import 'package:greentalkies/config.dart';
+import 'package:greentalkies/backend_config.dart'; // Use BackendConfig
 
 // ----------------------------
 // Hardcoded sample posts
@@ -72,7 +72,7 @@ class _GroveScreenState extends State<GroveScreen> {
   List<GrovePostModel> posts = [];
   List<GrovePostModel> filteredPosts = [];
   bool isLoading = true;
-  String? localIp;
+  String backendUrl = '';
   final uuid = const Uuid();
   String selectedTopic = 'All Topics';
 
@@ -84,29 +84,18 @@ class _GroveScreenState extends State<GroveScreen> {
   }
 
   Future<void> initData() async {
-    await getLocalIp();
+    final ip = await BackendConfig.getServerIp();
+    backendUrl = BackendConfig.apiBase(ip);
     await fetchPosts();
-  }
-
-  Future<void> getLocalIp() async {
-    try {
-      final info = NetworkInfo();
-      final ip = await info.getWifiIP();
-      setState(() => localIp = ip ?? '192.168.0.103'); // fallback
-    } catch (e) {
-      print("Error getting local IP: $e");
-      setState(() => localIp = '192.168.0.103'); // fallback
-    }
   }
 
   bool _isBackendPost(GrovePostModel post) => post.id.length == 24;
 
   Future<void> fetchPosts() async {
-    if (localIp == null) return;
+    if (backendUrl.isEmpty) return;
     setState(() => isLoading = true);
-    final baseUrl = 'http://$localIp:4000';
     try {
-      final response = await http.get(Uri.parse('$baseUrl/grove'));
+      final response = await http.get(Uri.parse('$backendUrl/grove'));
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         final backendPosts = data.map((e) => GrovePostModel.fromJson(e)).toList();
@@ -115,11 +104,8 @@ class _GroveScreenState extends State<GroveScreen> {
         for (var bp in backendPosts) merged[bp.id] = bp;
         setState(() {
           posts = merged.values.toList()
-            ..sort((a, b) {
-              final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-              final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-              return bTime.compareTo(aTime);
-            });
+            ..sort((a, b) => (b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0))
+                .compareTo(a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0)));
           applyTopicFilter();
           isLoading = false;
         });
@@ -154,7 +140,7 @@ class _GroveScreenState extends State<GroveScreen> {
     if (_isBackendPost(post)) {
       try {
         final response = await http.post(
-          Uri.parse('http://$localIp:4000/grove/${post.id}/like'),
+          Uri.parse('$backendUrl/grove/${post.id}/like'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({'userId': widget.userId}),
         );
@@ -187,7 +173,7 @@ class _GroveScreenState extends State<GroveScreen> {
     if (_isBackendPost(post)) {
       try {
         final response = await http.post(
-          Uri.parse('http://$localIp:4000/grove/${post.id}/comment'),
+          Uri.parse('$backendUrl/grove/${post.id}/comment'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'userId': widget.userId,
@@ -221,7 +207,7 @@ class _GroveScreenState extends State<GroveScreen> {
     if (_isBackendPost(post)) {
       try {
         final response = await http.delete(
-          Uri.parse('http://$localIp:4000/grove/${post.id}'),
+          Uri.parse('$backendUrl/grove/${post.id}'),
           headers: {"Content-Type": "application/json"},
           body: jsonEncode({"userId": widget.userId}),
         );
@@ -244,7 +230,7 @@ class _GroveScreenState extends State<GroveScreen> {
     if (_isBackendPost(post)) {
       try {
         final response = await http.delete(
-          Uri.parse('http://$localIp:4000/grove/${post.id}/comment/${comment.id}'),
+          Uri.parse('$backendUrl/grove/${post.id}/comment/${comment.id}'),
           headers: {"Content-Type": "application/json"},
           body: jsonEncode({"userId": widget.userId}),
         );
@@ -337,7 +323,7 @@ class _GroveScreenState extends State<GroveScreen> {
                             onComment: addComment,
                             onDelete: deletePost,
                             onDeleteComment: deleteComment,
-                            localIp: localIp,
+                            localIp: Uri.parse(backendUrl).host,
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -441,7 +427,7 @@ class GrovePostCard extends StatefulWidget {
   final Function(GrovePostModel)? onDelete;
   final Function(GrovePostModel, Comment)? onDeleteComment;
   final VoidCallback? onTap;
-  final String? localIp; // added
+  final String? localIp;
 
   const GrovePostCard({
     super.key,
