@@ -1,28 +1,26 @@
-BSD 3-Clause License
+# Custom Non-Commercial License
 
-Copyright (c) 2025, Radhika Gupta
+Copyright (c) 2025 Radhika Gupta
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
+All rights reserved.
 
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
+Permission is hereby granted to any individual or organization to use, view, copy, modify, and distribute this software and its source code solely for personal, educational, research, and other non-commercial purposes, provided that:
 
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
+1. Proper credit is given to the original author, Radhika Gupta.
+2. A copy of this license is included with any redistribution or modification of the software.
+3. Any modified versions must clearly state that changes were made to the original project.
 
-3. Neither the name of the copyright holder nor the names of its
-   contributors may be used to endorse or promote products derived from
-   this software without specific prior written permission.
+Commercial use of this software is strictly prohibited without prior written permission from the author.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+For the purposes of this license, “commercial use” includes, but is not limited to:
+
+* Selling the software or any modified version of it
+* Using the software in paid products or services
+* Monetizing the software through advertisements, subscriptions, sponsorships, or donations directly tied to the software
+* Using the software in a business, startup, or organization for revenue-generating purposes
+
+Any individual or organization seeking commercial usage rights must contact the author, Radhika Gupta, to negotiate a separate commercial agreement, which may include revenue sharing, licensing fees, attribution requirements, or partnership terms.
+
+Unauthorized commercial use of this software may result in legal action.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE SOFTWARE OR ITS USE.
