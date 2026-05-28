@@ -134,12 +134,6 @@ Contributions are welcome!
 
 ---
 
-## 📜 License
-
-This project is licensed under the MIT License.
-
----
-
 ## 💚 Final Note
 
 GreenTalkies is not just an app — it's a step toward a greener, smarter, and more connected world 🌱🌍
