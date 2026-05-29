@@ -1,26 +1,76 @@
-# Custom Non-Commercial License
+Custom Non-Commercial Software License
 
-Copyright (c) 2025 Radhika Gupta
+Copyright (c) 2026 Radhika Gupta
 
 All rights reserved.
 
-Permission is hereby granted to any individual or organization to use, view, copy, modify, and distribute this software and its source code solely for personal, educational, research, and other non-commercial purposes, provided that:
+Permission is hereby granted, free of charge, to any individual or organization to use, view, copy, and modify this software and its associated source code solely for non-commercial purposes, subject to the terms and conditions set forth in this License.
 
-1. Proper credit is given to the original author, Radhika Gupta.
-2. A copy of this license is included with any redistribution or modification of the software.
-3. Any modified versions must clearly state that changes were made to the original project.
+For the purposes of this License, “non-commercial purposes” include personal use, educational use, academic research, and other activities that do not involve commercial exploitation.
 
-Commercial use of this software is strictly prohibited without prior written permission from the author.
+---
 
-For the purposes of this license, “commercial use” includes, but is not limited to:
+1. CONDITIONS OF USE
 
-* Selling the software or any modified version of it
-* Using the software in paid products or services
-* Monetizing the software through advertisements, subscriptions, sponsorships, or donations directly tied to the software
-* Using the software in a business, startup, or organization for revenue-generating purposes
+Any permitted use of this software must comply with the following conditions:
 
-Any individual or organization seeking commercial usage rights must contact the author, Radhika Gupta, to negotiate a separate commercial agreement, which may include revenue sharing, licensing fees, attribution requirements, or partnership terms.
+1.1 Attribution Requirement
+Proper credit must be given to the original author, Radhika Gupta, in all copies or substantial portions of the software.
 
-Unauthorized commercial use of this software may result in legal action.
+1.2 Inclusion of License
+A complete copy of this License must be included in all redistributed or modified versions of the software.
 
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE SOFTWARE OR ITS USE.
+1.3 Modification Disclosure
+If the software is modified, enhanced, or derived from, the resulting work must clearly indicate that changes have been made to the original version.
+
+---
+
+2. RESTRICTIONS ON COMMERCIAL USE
+
+This software and its source code may not be used for any commercial purpose without prior written authorization from the copyright holder.
+
+For the purposes of this License, “commercial use” includes, but is not limited to:
+
+- Sale, licensing, or distribution of the software or any modified version thereof for monetary compensation
+- Incorporation of the software into paid products, services, or enterprise systems
+- Monetization through advertisements, subscriptions, sponsorships, or donations directly associated with the software
+- Use of the software within any business, startup, or organization engaged in revenue-generating activities
+
+---
+
+3. COMMERCIAL LICENSING
+
+Any individual or organization wishing to obtain rights for commercial use must acquire explicit written permission from the copyright holder.
+
+Such permission may be granted under a separate commercial agreement, which may include:
+
+- Licensing fees
+- Revenue-sharing arrangements
+- Attribution requirements
+- Partnership or collaboration terms
+
+No commercial rights are granted under this License by default.
+
+---
+
+4. DISCLAIMER OF WARRANTY
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+---
+
+5. LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE, MODIFICATION, OR DISTRIBUTION OF THIS SOFTWARE.
+
+---
+
+6. TERMINATION
+
+Any violation of the terms of this License shall result in automatic termination of the rights granted herein. Upon termination, all copies of the software must cease use and be removed where applicable.
+
+---
+
+7. ENTIRE AGREEMENT
+
+This License constitutes the entire agreement governing the use of the software and supersedes any prior understandings or representations regarding its use.
